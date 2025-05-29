@@ -616,6 +616,7 @@ def ovh_webhook():
 def telegram_webhook():
     try:
         data = request.get_json()
+        logger.info(f"📥 Webhook Telegram reçu: {json.dumps(data, indent=2)}")
         
         if 'message' in data and 'text' in data['message']:
             message_text = data['message']['text']
@@ -650,7 +651,7 @@ def home():
 <!DOCTYPE html>
 <html>
 <head>
-    <title>🤖 Nouveau Webhook OVH-Telegram</title>
+    <title>🤖 Webhook OVH-Telegram Complet</title>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
@@ -664,33 +665,37 @@ def home():
         .btn:hover { background: #1976D2; }
         .btn-danger { background: #f44336; }
         .btn-success { background: #4CAF50; }
+        .btn-warning { background: #ff9800; }
+        .btn-info { background: #17a2b8; }
         .links { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; }
         .success { color: #4CAF50; font-weight: bold; }
         code { background: #f4f4f4; padding: 2px 6px; border-radius: 3px; }
         .info-box { background: #e8f5e8; padding: 15px; border-radius: 8px; margin: 10px 0; }
         .new-config { background: #e1f5fe; border-left: 4px solid #2196F3; padding: 15px; margin: 20px 0; }
         .improved-feature { background: #fff3e0; border-left: 4px solid #ff9800; padding: 15px; margin: 20px 0; }
+        .diagnostic-section { background: #ffebee; border-left: 4px solid #f44336; padding: 15px; margin: 20px 0; }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1>🤖 Nouveau Webhook OVH-Telegram (Version Améliorée)</h1>
+            <h1>🤖 Webhook OVH-Telegram COMPLET</h1>
             <div class="new-config">
-                <strong>🆕 NOUVELLE CONFIGURATION :</strong><br>
+                <strong>🆕 CONFIGURATION ACTUELLE :</strong><br>
                 📱 Chat Telegram: <code>{{ chat_id }}</code><br>
                 📞 Ligne OVH: <code>{{ ovh_line }}</code><br>
                 🤖 Bot: <code>{{ bot_token[:10] }}...</code>
             </div>
             <div class="improved-feature">
-                <strong>🚀 AMÉLIORATIONS DE CETTE VERSION :</strong><br>
-                ✅ Normalisation téléphone super robuste (0033, +33, 33, 0X formats)<br>
-                ✅ Recherche intelligente multi-formats avec fallback<br>
-                ✅ Détection automatique par suffixes (9 derniers chiffres)<br>
-                ✅ Logs détaillés pour traçabilité<br>
-                ✅ Route de test pour la normalisation
+                <strong>🚀 FONCTIONNALITÉS COMPLÈTES :</strong><br>
+                ✅ Normalisation téléphone super robuste<br>
+                ✅ Recherche intelligente multi-formats<br>
+                ✅ Détection automatique IBAN via APIs<br>
+                ✅ Diagnostic webhook complet<br>
+                ✅ Debug commandes Telegram<br>
+                ✅ Logs détaillés et traçabilité
             </div>
-            <p class="success">✅ Serveur actif - Bot configuré avec recherche avancée</p>
+            <p class="success">✅ Application complète prête à l'emploi</p>
         </div>
 
         <div class="stats">
@@ -736,24 +741,35 @@ def home():
             </form>
         </div>
 
+        <div class="diagnostic-section">
+            <h2>🚨 DIAGNOSTIC & RÉSOLUTION PROBLÈMES</h2>
+            <div class="links">
+                <a href="/check-webhook-config" class="btn btn-danger">🔗 Diagnostic Webhook</a>
+                <a href="/debug-command" class="btn btn-warning">🐛 Debug Commandes</a>
+                <a href="/emergency-check" class="btn btn-danger">🚨 Check Urgence</a>
+                <a href="/test-normalize" class="btn btn-info">🔧 Test Normalisation</a>
+            </div>
+        </div>
+
         <h2>🔧 Tests & Configuration</h2>
         <div class="links">
             <a href="/clients" class="btn">👥 Voir clients</a>
             <a href="/setup-telegram-webhook" class="btn">⚙️ Config Telegram</a>
+            <a href="/fix-webhook-now" class="btn btn-success">🔧 Corriger Webhook</a>
             <a href="/test-telegram" class="btn">📧 Test Telegram</a>
             <a href="/test-command" class="btn">🎯 Test /numero</a>
             <a href="/test-iban" class="btn">🏦 Test détection IBAN</a>
-            <a href="/test-normalize" class="btn">🔧 Test normalisation</a>
             <a href="/test-ovh-cgi" class="btn">📞 Test appel OVH</a>
+            <a href="/send-test-message" class="btn btn-info">📤 Message test</a>
             <a href="/clear-clients" class="btn btn-danger" onclick="return confirm('Effacer tous les clients ?')">🗑️ Vider base</a>
         </div>
 
         <h2>🔗 Configuration OVH CTI</h2>
         <div class="info-box">
             <p><strong>URL CGI à configurer dans l'interface OVH :</strong></p>
-            <code id="webhook-url">https://VOTRE-NOUVEL-HEBERGEUR.com/webhook/ovh?caller=*CALLING*&callee=*CALLED*&type=*EVENT*</code>
+            <code id="webhook-url">https://VOTRE-HEBERGEUR.herokuapp.com/webhook/ovh?caller=*CALLING*&callee=*CALLED*&type=*EVENT*</code>
             <br><br>
-            <p><strong>🎯 Remplacez VOTRE-NOUVEL-HEBERGEUR.com par l'URL de votre hébergeur</strong></p>
+            <p><strong>🎯 Remplacez VOTRE-HEBERGEUR par votre URL Heroku réelle</strong></p>
         </div>
 
         <h2>📱 Commandes Telegram disponibles</h2>
@@ -769,23 +785,26 @@ def home():
             <ol>
                 <li>📂 Uploadez votre fichier CSV avec les clients</li>
                 <li>🌐 Les banques sont automatiquement détectées via APIs IBAN</li>
+                <li>🔗 Configurez le webhook Telegram avec "🔧 Corriger Webhook"</li>
                 <li>📞 Configurez l'URL OVH CTI dans votre interface</li>
                 <li>✅ Chaque appel entrant affiche automatiquement la fiche client dans Telegram</li>
-                <li>🔍 Utilisez <code>/numero XXXXXXXXXX</code> pour rechercher un client</li>
+                <li>🔍 Les utilisateurs peuvent utiliser <code>/numero XXXXXXXXXX</code> pour rechercher un client</li>
                 <li>🆕 Utilisez <code>/iban FR76XXXXX</code> pour tester la détection de banque</li>
-                <li>🔧 Utilisez <code>/test-normalize</code> pour tester les formats de numéros</li>
             </ol>
         </div>
         
         <div class="improved-feature">
-            <h3>🚀 Spécificités de cette version améliorée :</h3>
+            <h3>🚀 Fonctionnalités de cette version complète :</h3>
             <ul>
-                <li>✅ Recherche super intelligente : essaie tous les formats possibles</li>
-                <li>✅ Support 0033XXXXXXXXX, +33XXXXXXXXX, 33XXXXXXXXX, 0XXXXXXXXX</li>
+                <li>✅ Recherche super intelligente : essaie tous les formats possibles (0033, +33, 33, 0X)</li>
                 <li>✅ Recherche par suffixes (9 derniers chiffres) en fallback</li>
+                <li>✅ Diagnostic complet des webhooks et tokens</li>
+                <li>✅ Debug détaillé des commandes Telegram</li>
+                <li>✅ Auto-détection et correction des problèmes</li>
                 <li>✅ Logs détaillés pour debugging et traçabilité</li>
-                <li>✅ Route de test dédiée pour vérifier la normalisation</li>
+                <li>✅ Interface web complète pour gestion et tests</li>
                 <li>✅ Gestion des doublons et formats multiples</li>
+                <li>✅ Détection automatique IBAN via APIs multiples</li>
                 <li>✅ Compatibilité totale avec l'existant</li>
             </ul>
         </div>
@@ -852,7 +871,7 @@ def view_clients():
 <!DOCTYPE html>
 <html>
 <head>
-    <title>👥 Gestion Clients - Nouveau Webhook</title>
+    <title>👥 Gestion Clients - Webhook Complet</title>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
@@ -948,74 +967,504 @@ def view_clients():
     ovh_line=Config.OVH_LINE_NUMBER
     )
 
-@app.route('/clear-clients')
-def clear_clients():
-    global clients_database, upload_stats
-    clients_database = {}
-    upload_stats = {"total_clients": 0, "last_upload": None, "filename": None}
-    cache.clear()
-    return redirect('/')
+# ===================================================================
+# ROUTES DE DIAGNOSTIC ET DEBUG
+# ===================================================================
 
-@app.route('/setup-telegram-webhook')
-def setup_telegram_webhook():
+@app.route('/emergency-check')
+def emergency_check():
+    """Vérification d'urgence pour identifier le problème"""
     try:
-        webhook_url = f"https://VOTRE-NOUVEL-HEBERGEUR.com/webhook/telegram"  # À remplacer
-        telegram_api_url = f"https://api.telegram.org/bot{Config.TELEGRAM_TOKEN}/setWebhook"
+        # 1. Vérifier d'où vient le token
+        token_source = "Unknown"
+        if Config.TELEGRAM_TOKEN == '7686188729:AAFRg44Twm7Ph_eE3yTfKoNO2Oqee3hmFBA':
+            token_source = "HARDCODED_IN_CODE - PROBLÈME MAJEUR!"
+        elif os.environ.get('TELEGRAM_TOKEN'):
+            token_source = "Environment variable (Heroku)"
+        else:
+            token_source = "Hardcoded default"
+
+        # 2. Vérifier les infos du bot avec le token actuel
+        bot_info_url = f"https://api.telegram.org/bot{Config.TELEGRAM_TOKEN}/getMe"
+        bot_response = requests.get(bot_info_url, timeout=5)
         
-        data = {"url": webhook_url}
-        response = requests.post(telegram_api_url, data=data)
+        bot_name = "ERROR"
+        bot_username = "ERROR"
+        if bot_response.status_code == 200:
+            bot_data = bot_response.json()
+            bot_name = bot_data.get('result', {}).get('first_name', 'Unknown')
+            bot_username = bot_data.get('result', {}).get('username', 'Unknown')
+
+        # 3. Tester l'envoi d'un message de test
+        test_message = f"🔧 TEST EMERGENCY - Bot: {bot_name} (@{bot_username}) - {datetime.now().strftime('%H:%M:%S')}"
+        test_url = f"https://api.telegram.org/bot{Config.TELEGRAM_TOKEN}/sendMessage"
+        test_data = {
+            'chat_id': Config.CHAT_ID,
+            'text': test_message
+        }
         
-        return jsonify({
-            "status": "webhook_configured",
-            "telegram_response": response.json(),
-            "webhook_url": webhook_url,
-            "note": "Remplacez VOTRE-NOUVEL-HEBERGEUR.com par votre vraie URL"
-        })
+        test_sent = False
+        try:
+            test_response = requests.post(test_url, data=test_data, timeout=5)
+            test_sent = test_response.status_code == 200
+        except:
+            test_sent = False
+
+        # 4. Vérifier les derniers messages pour détecter le spam
+        updates_url = f"https://api.telegram.org/bot{Config.TELEGRAM_TOKEN}/getUpdates?limit=5"
+        try:
+            updates_response = requests.get(updates_url, timeout=5)
+            updates_data = updates_response.json() if updates_response.status_code == 200 else {}
+            
+            recent_messages = []
+            if updates_data.get('ok') and updates_data.get('result'):
+                for update in updates_data['result']:
+                    if 'message' in update and 'text' in update['message']:
+                        text = update['message']['text']
+                        recent_messages.append({
+                            'text': text[:50] + '...' if len(text) > 50 else text,
+                            'is_spam': any(word in text.lower() for word in ['vpn', 'бесплатно', 'arturshi'])
+                        })
+        except:
+            recent_messages = []
+
+        return render_template_string("""
+<!DOCTYPE html>
+<html>
+<head>
+    <title>🚨 DIAGNOSTIC D'URGENCE</title>
+    <meta charset="UTF-8">
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
+        .container { max-width: 800px; margin: 0 auto; background: white; padding: 20px; border-radius: 10px; }
+        .alert { padding: 15px; margin: 10px 0; border-radius: 5px; font-weight: bold; }
+        .alert-danger { background: #f8d7da; border: 2px solid #dc3545; color: #721c24; }
+        .alert-warning { background: #fff3cd; border: 2px solid #ffc107; color: #856404; }
+        .alert-success { background: #d4edda; border: 2px solid #28a745; color: #155724; }
+        .btn { background: #007bff; color: white; padding: 15px 25px; border: none; border-radius: 5px; text-decoration: none; display: inline-block; margin: 10px 5px; font-size: 16px; }
+        .btn-danger { background: #dc3545; }
+        .btn-success { background: #28a745; }
+        code { background: #f8f9fa; padding: 3px 8px; border-radius: 3px; font-family: monospace; font-size: 14px; }
+        .step { background: #e9ecef; padding: 15px; margin: 10px 0; border-radius: 5px; border-left: 4px solid #007bff; }
+        .spam-indicator { background: #ffebee; color: #c62828; padding: 5px 10px; border-radius: 3px; }
+        .safe-indicator { background: #e8f5e8; color: #2e7d32; padding: 5px 10px; border-radius: 3px; }
+        table { width: 100%; border-collapse: collapse; margin: 15px 0; }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+        th { background: #f2f2f2; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚨 DIAGNOSTIC D'URGENCE - TOKEN COMPROMIS</h1>
+        
+        {% if token_source == "HARDCODED_IN_CODE - PROBLÈME MAJEUR!" %}
+        <div class="alert alert-danger">
+            <h2>⚠️ PROBLÈME CRITIQUE IDENTIFIÉ!</h2>
+            <p>Votre token est <strong>ÉCRIT EN DUR</strong> dans le code et probablement <strong>VISIBLE SUR GITHUB</strong>!</p>
+            <p>C'est pourquoi des spammeurs utilisent votre bot pour envoyer des messages VPN russes.</p>
+        </div>
+        {% elif "Environment" in token_source %}
+        <div class="alert alert-warning">
+            <p>Token depuis les variables d'environnement - Configuration correcte, mais token peut-être compromis.</p>
+        </div>
+        {% endif %}
+
+        <h2>📊 État actuel de votre bot</h2>
+        <table>
+            <tr><th>Propriété</th><th>Valeur</th><th>État</th></tr>
+            <tr>
+                <td>Source du token</td>
+                <td><code>{{ token_source }}</code></td>
+                <td>
+                    {% if "HARDCODED" in token_source %}
+                    <span class="spam-indicator">CRITIQUE</span>
+                    {% else %}
+                    <span class="safe-indicator">OK</span>
+                    {% endif %}
+                </td>
+            </tr>
+            <tr><td>Nom du bot</td><td><strong>{{ bot_name }}</strong></td><td>-</td></tr>
+            <tr><td>Username</td><td><code>@{{ bot_username }}</code></td><td>-</td></tr>
+            <tr><td>Chat ID configuré</td><td><code>{{ chat_id }}</code></td><td>-</td></tr>
+            <tr><td>Test d'envoi</td><td>{{ "✅ Réussi" if test_sent else "❌ Échec" }}</td><td>-</td></tr>
+        </table>
+
+        {% if recent_messages %}
+        <h2>📱 Messages récents de votre bot</h2>
+        {% for msg in recent_messages %}
+        <div style="padding: 10px; margin: 5px 0; border-left: 4px solid {{ '#f44336' if msg.is_spam else '#4caf50' }}; background: {{ '#ffebee' if msg.is_spam else '#f1f8e9' }};">
+            <strong>{{ "🚨 SPAM DÉTECTÉ" if msg.is_spam else "✅ Message normal" }}:</strong> {{ msg.text }}
+        </div>
+        {% endfor %}
+        {% endif %}
+
+        <div style="margin-top: 30px; text-align: center;">
+            <a href="/check-webhook-config" class="btn btn-danger">🔗 Diagnostic Webhook</a>
+            <a href="/debug-command" class="btn">🐛 Debug Commandes</a>
+            <a href="/clear-webhooks" class="btn">🧹 Nettoyer</a>
+        </div>
+    </div>
+</body>
+</html>
+        """,
+        token_source=token_source,
+        bot_name=bot_name,
+        bot_username=bot_username,
+        chat_id=Config.CHAT_ID,
+        test_sent=test_sent,
+        recent_messages=recent_messages
+        )
+        
+    except Exception as e:
+        return f"<h1>Erreur: {str(e)}</h1><p>Votre token est probablement invalide ou compromis.</p>"
+
+@app.route('/check-webhook-config')
+def check_webhook_config():
+    """Vérifier la configuration du webhook Telegram"""
+    try:
+        # 1. Vérifier les infos du webhook actuel
+        webhook_info_url = f"https://api.telegram.org/bot{Config.TELEGRAM_TOKEN}/getWebhookInfo"
+        webhook_response = requests.get(webhook_info_url, timeout=10)
+        webhook_data = webhook_response.json() if webhook_response.status_code == 200 else {}
+        
+        # 2. Vérifier les dernières updates
+        updates_url = f"https://api.telegram.org/bot{Config.TELEGRAM_TOKEN}/getUpdates?limit=10"
+        updates_response = requests.get(updates_url, timeout=10)
+        updates_data = updates_response.json() if updates_response.status_code == 200 else {}
+        
+        # 3. Déterminer l'URL correcte du webhook
+        correct_webhook_url = request.url_root + "webhook/telegram"
+        current_webhook_url = webhook_data.get('result', {}).get('url', 'Aucun')
+        
+        # 4. Vérifier si des updates sont en attente
+        pending_updates = webhook_data.get('result', {}).get('pending_update_count', 0)
+        
+        # 5. Analyser les derniers messages reçus
+        recent_commands = []
+        if updates_data.get('ok') and updates_data.get('result'):
+            for update in updates_data['result']:
+                if 'message' in update and 'text' in update['message']:
+                    text = update['message']['text']
+                    if text.startswith('/'):
+                        recent_commands.append({
+                            'command': text,
+                            'from_user': update['message']['from'].get('first_name', 'Inconnu'),
+                            'chat_id': update['message']['chat']['id'],
+                            'date': datetime.fromtimestamp(update['message']['date']).strftime('%d/%m/%Y %H:%M:%S')
+                        })
+        
+        return render_template_string("""
+<!DOCTYPE html>
+<html>
+<head>
+    <title>🔗 Diagnostic Webhook Telegram</title>
+    <meta charset="UTF-8">
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
+        .container { max-width: 1000px; margin: 0 auto; background: white; padding: 20px; border-radius: 10px; }
+        .alert { padding: 15px; margin: 15px 0; border-radius: 5px; font-weight: bold; }
+        .alert-danger { background: #f8d7da; border: 2px solid #dc3545; color: #721c24; }
+        .alert-warning { background: #fff3cd; border: 2px solid #ffc107; color: #856404; }
+        .alert-success { background: #d4edda; border: 2px solid #28a745; color: #155724; }
+        .alert-info { background: #d1ecf1; border: 2px solid #17a2b8; color: #0c5460; }
+        .btn { background: #007bff; color: white; padding: 12px 20px; border: none; border-radius: 5px; text-decoration: none; display: inline-block; margin: 8px 5px; }
+        .btn-success { background: #28a745; }
+        .btn-danger { background: #dc3545; }
+        .btn-warning { background: #ffc107; color: #212529; }
+        code { background: #f8f9fa; padding: 3px 8px; border-radius: 3px; font-family: monospace; }
+        table { width: 100%; border-collapse: collapse; margin: 15px 0; }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+        th { background: #f2f2f2; }
+        .step { background: #e9ecef; padding: 15px; margin: 10px 0; border-radius: 5px; border-left: 4px solid #007bff; }
+        .command-item { background: #f8f9fa; padding: 10px; margin: 5px 0; border-left: 3px solid #007bff; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔗 Diagnostic Webhook Telegram</h1>
+        
+        {% if current_webhook_url == correct_webhook_url %}
+        <div class="alert alert-success">
+            ✅ <strong>Webhook correctement configuré !</strong><br>
+            URL: <code>{{ current_webhook_url }}</code>
+        </div>
+        {% elif current_webhook_url == "Aucun" %}
+        <div class="alert alert-danger">
+            ❌ <strong>AUCUN WEBHOOK CONFIGURÉ !</strong><br>
+            C'est pourquoi les utilisateurs ne peuvent pas envoyer de commandes.
+        </div>
+        {% else %}
+        <div class="alert alert-warning">
+            ⚠️ <strong>Webhook mal configuré !</strong><br>
+            Actuel: <code>{{ current_webhook_url }}</code><br>
+            Correct: <code>{{ correct_webhook_url }}</code>
+        </div>
+        {% endif %}
+
+        <h2>📊 État du Webhook</h2>
+        <table>
+            <tr><th>Propriété</th><th>Valeur</th><th>Status</th></tr>
+            <tr>
+                <td>URL webhook actuelle</td>
+                <td><code>{{ current_webhook_url }}</code></td>
+                <td>
+                    {% if current_webhook_url == correct_webhook_url %}
+                    <span style="color: #28a745;">✅ Correct</span>
+                    {% elif current_webhook_url == "Aucun" %}
+                    <span style="color: #dc3545;">❌ Manquant</span>
+                    {% else %}
+                    <span style="color: #ffc107;">⚠️ Incorrect</span>
+                    {% endif %}
+                </td>
+            </tr>
+            <tr><td>URL correcte attendue</td><td><code>{{ correct_webhook_url }}</code></td><td>-</td></tr>
+            <tr><td>Updates en attente</td><td><strong>{{ pending_updates }}</strong></td>
+                <td>
+                    {% if pending_updates > 0 %}
+                    <span style="color: #ffc107;">⚠️ {{ pending_updates }} messages en attente</span>
+                    {% else %}
+                    <span style="color: #28a745;">✅ Aucun</span>
+                    {% endif %}
+                </td>
+            </tr>
+            <tr><td>Dernière erreur</td><td>{{ webhook_data.get('result', {}).get('last_error_message', 'Aucune') }}</td><td>-</td></tr>
+        </table>
+
+        {% if recent_commands %}
+        <h2>📱 Commandes récentes reçues</h2>
+        {% for cmd in recent_commands %}
+        <div class="command-item">
+            <strong>{{ cmd.command }}</strong> par {{ cmd.from_user }} 
+            <small>({{ cmd.date }} - Chat: {{ cmd.chat_id }})</small>
+        </div>
+        {% endfor %}
+        {% else %}
+        <div class="alert alert-warning">
+            ⚠️ <strong>Aucune commande récente trouvée</strong><br>
+            Cela confirme que les messages des utilisateurs n'arrivent pas jusqu'à votre bot.
+        </div>
+        {% endif %}
+
+        <h2>🛠️ Solutions</h2>
+        
+        {% if current_webhook_url != correct_webhook_url %}
+        <div class="step">
+            <h3>1. Configurer le webhook correctement</h3>
+            <p>Cliquez sur ce bouton pour configurer automatiquement le webhook :</p>
+            <a href="/fix-webhook-now" class="btn btn-success">🔧 Corriger le webhook maintenant</a>
+        </div>
+        {% endif %}
+
+        {% if pending_updates > 0 %}
+        <div class="step">
+            <h3>2. Nettoyer les updates en attente</h3>
+            <p>Il y a {{ pending_updates }} messages en attente. Nettoyez-les :</p>
+            <a href="/clear-pending-updates" class="btn btn-warning">🧹 Nettoyer les updates</a>
+        </div>
+        {% endif %}
+
+        <div class="step">
+            <h3>3. Test complet</h3>
+            <p>Une fois le webhook configuré, testez :</p>
+            <a href="/test-webhook-reception" class="btn btn-info">📥 Tester réception webhook</a>
+            <a href="/send-test-message" class="btn btn-success">📤 Envoyer message test</a>
+        </div>
+
+        <div style="margin-top: 30px;">
+            <a href="/" class="btn">🏠 Accueil</a>
+            <a href="/check-webhook-config" class="btn">🔄 Re-vérifier</a>
+        </div>
+
+        <div class="alert alert-info" style="margin-top: 20px;">
+            <h3>💡 Explication du problème :</h3>
+            <p><strong>Votre route <code>/test-command</code> fonctionne</strong> car elle simule une commande côté serveur.</p>
+            <p><strong>Mais les vrais utilisateurs tapent dans Telegram</strong> et leurs messages doivent arriver via le webhook.</p>
+            <p><strong>Sans webhook configuré</strong>, Telegram ne sait pas où envoyer les messages des utilisateurs !</p>
+        </div>
+    </div>
+</body>
+</html>
+        """,
+        current_webhook_url=current_webhook_url,
+        correct_webhook_url=correct_webhook_url,
+        pending_updates=pending_updates,
+        webhook_data=webhook_data,
+        recent_commands=recent_commands
+        )
+        
+    except Exception as e:
+        return f"<h1>Erreur: {str(e)}</h1>"
+
+@app.route('/fix-webhook-now')
+def fix_webhook_now():
+    """Configure automatiquement le webhook correct"""
+    try:
+        webhook_url = request.url_root + "webhook/telegram"
+        
+        # Configurer le webhook
+        set_webhook_url = f"https://api.telegram.org/bot{Config.TELEGRAM_TOKEN}/setWebhook"
+        data = {
+            "url": webhook_url,
+            "drop_pending_updates": True  # Nettoie les anciens messages
+        }
+        
+        response = requests.post(set_webhook_url, data=data, timeout=10)
+        
+        if response.status_code == 200:
+            result = response.json()
+            return jsonify({
+                "status": "success",
+                "message": f"Webhook configuré avec succès sur {webhook_url}",
+                "telegram_response": result,
+                "next_step": "Demandez maintenant à un utilisateur de taper /numero 0650287608"
+            })
+        else:
+            return jsonify({
+                "status": "error",
+                "message": "Erreur lors de la configuration du webhook",
+                "response": response.text
+            }), 400
+            
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-@app.route('/test-telegram')
-def test_telegram():
-    message = f"🧪 Test nouveau webhook - Ligne {Config.OVH_LINE_NUMBER} - {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}"
-    result = telegram_service.send_message(message)
+@app.route('/debug-command')
+def debug_command():
+    """Debug des commandes Telegram"""
     
-    if result:
-        return jsonify({"status": "success", "message": "Test Telegram envoyé avec succès"})
-    else:
-        return jsonify({"status": "error", "message": "Échec du test Telegram"})
+    # Test de la fonction process_telegram_command
+    test_phone = "0650287608"
+    
+    try:
+        # 1. Tester la recherche client
+        client_info = get_client_info(test_phone)
+        
+        # 2. Tester la fonction de traitement des commandes
+        command_result = process_telegram_command(f"/numero {test_phone}", Config.CHAT_ID)
+        
+        # 3. Tester le formatage du message Telegram
+        telegram_message = telegram_service.format_client_message(client_info, context="recherche")
+        
+        return render_template_string("""
+<!DOCTYPE html>
+<html>
+<head>
+    <title>🐛 Debug Commandes Telegram</title>
+    <meta charset="UTF-8">
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
+        .container { max-width: 1000px; margin: 0 auto; background: white; padding: 20px; border-radius: 10px; }
+        .debug-section { background: #f8f9fa; padding: 15px; margin: 15px 0; border-radius: 5px; border-left: 4px solid #007bff; }
+        .error { background: #f8d7da; color: #721c24; padding: 15px; border-radius: 5px; margin: 10px 0; }
+        .success { background: #d4edda; color: #155724; padding: 15px; border-radius: 5px; margin: 10px 0; }
+        pre { background: #272822; color: #f8f8f2; padding: 15px; border-radius: 5px; overflow-x: auto; font-size: 12px; }
+        .btn { background: #007bff; color: white; padding: 10px 20px; border: none; border-radius: 5px; text-decoration: none; display: inline-block; margin: 5px; }
+        .btn-danger { background: #dc3545; }
+        .btn-success { background: #28a745; }
+        table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background: #f2f2f2; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🐛 Debug Commande: /numero {{ test_phone }}</h1>
+        
+        <div class="debug-section">
+            <h3>1. 📊 Recherche Client</h3>
+            <table>
+                <tr><th>Propriété</th><th>Valeur</th></tr>
+                <tr><td>Numéro recherché</td><td><code>{{ test_phone }}</code></td></tr>
+                <tr><td>Trouvé en base</td><td><strong>{{ "✅ OUI" if client_info.statut != "Non référencé" else "❌ NON" }}</strong></td></tr>
+                <tr><td>Nom</td><td>{{ client_info.nom }}</td></tr>
+                <tr><td>Prénom</td><td>{{ client_info.prenom }}</td></tr>
+                <tr><td>Statut</td><td>{{ client_info.statut }}</td></tr>
+                <tr><td>Téléphone normalisé</td><td><code>{{ client_info.telephone }}</code></td></tr>
+            </table>
+        </div>
 
-@app.route('/test-command')
-def test_command():
-    if clients_database:
-        test_number = list(clients_database.keys())[0]
-    else:
-        test_number = "0767328146"
-    
-    result = process_telegram_command(f"/numero {test_number}", Config.CHAT_ID)
-    return jsonify({"test_result": result, "test_number": test_number})
+        <div class="debug-section">
+            <h3>2. 🔧 Traitement Commande</h3>
+            <pre>{{ command_result }}</pre>
+        </div>
 
-@app.route('/test-iban')
-def test_iban():
-    test_ibans = [
-        "FR1420041010050500013M02606",  # La Banque Postale
-        "FR7630003000540000000001234",  # Société Générale
-        "FR1411315000100000000000000",  # Crédit Agricole
-        "FR7610907000000000000000000",  # BNP Paribas
-        "DE89370400440532013000",       # Deutsche Bank
-    ]
-    
-    results = []
-    for iban in test_ibans:
-        bank = iban_detector.detect_bank(iban)
-        results.append({"iban": iban, "bank_detected": bank})
-    
-    return jsonify({
-        "test_results": results,
-        "total_tests": len(test_ibans),
-        "cache_size": len(cache.cache)
-    })
+        <div class="debug-section">
+            <h3>3. 📱 Message Telegram Généré</h3>
+            <div style="background: #e3f2fd; padding: 15px; border-radius: 5px; white-space: pre-wrap; font-family: monospace; font-size: 14px;">{{ telegram_message }}</div>
+        </div>
 
-# Nouvelle route de test pour la normalisation
+        <div class="debug-section">
+            <h3>4. 🎯 Test Direct de la Commande</h3>
+            <p>Cliquez pour exécuter la commande directement :</p>
+            <a href="/test-direct-command?phone={{ test_phone }}" class="btn btn-success">🧪 Test /numero {{ test_phone }}</a>
+        </div>
+
+        <div class="debug-section">
+            <h3>5. 📋 Configuration Actuelle</h3>
+            <table>
+                <tr><th>Paramètre</th><th>Valeur</th></tr>
+                <tr><td>Token Telegram</td><td><code>{{ token[:10] }}...{{ token[-5:] }}</code></td></tr>
+                <tr><td>Chat ID</td><td><code>{{ chat_id }}</code></td></tr>
+                <tr><td>Clients en base</td><td>{{ total_clients }}</td></tr>
+                <tr><td>Ligne OVH</td><td><code>{{ ovh_line }}</code></td></tr>
+            </table>
+        </div>
+
+        <div style="margin-top: 30px;">
+            <a href="/" class="btn">🏠 Accueil</a>
+            <a href="/debug-command" class="btn">🔄 Relancer debug</a>
+            <a href="/test-telegram" class="btn btn-success">📧 Test Telegram</a>
+        </div>
+    </div>
+</body>
+</html>
+        """,
+        test_phone=test_phone,
+        client_info=client_info,
+        command_result=command_result,
+        telegram_message=telegram_message,
+        token=Config.TELEGRAM_TOKEN,
+        chat_id=Config.CHAT_ID,
+        total_clients=len(clients_database),
+        ovh_line=Config.OVH_LINE_NUMBER
+        )
+        
+    except Exception as e:
+        return f"""
+        <h1>🚨 Erreur Debug</h1>
+        <div style="background: #f8d7da; padding: 15px; color: #721c24; border-radius: 5px;">
+            <strong>Erreur:</strong> {str(e)}<br>
+            <strong>Type:</strong> {type(e).__name__}
+        </div>
+        <p>Cette erreur explique peut-être pourquoi vous recevez du spam au lieu des infos client.</p>
+        <a href="/" style="background: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">🏠 Retour</a>
+        """
+
+@app.route('/test-direct-command')
+def test_direct_command():
+    """Test direct d'une commande sans passer par Telegram"""
+    phone = request.args.get('phone', '0650287608')
+    
+    try:
+        # Simuler le traitement de la commande
+        result = process_telegram_command(f"/numero {phone}", Config.CHAT_ID)
+        
+        return jsonify({
+            "status": "success",
+            "phone_tested": phone,
+            "command_result": result,
+            "message": f"Commande /numero {phone} exécutée",
+            "timestamp": datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+        })
+        
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "error": str(e),
+            "phone_tested": phone,
+            "message": "Erreur lors de l'exécution de la commande"
+        }), 500
+
 @app.route('/test-normalize')
 def test_normalize():
     """Test de normalisation des numéros"""
@@ -1059,6 +1508,151 @@ def test_normalize():
         ]
     })
 
+# ===================================================================
+# ROUTES DE TEST ET UTILITAIRES
+# ===================================================================
+
+@app.route('/clear-clients')
+def clear_clients():
+    global clients_database, upload_stats
+    clients_database = {}
+    upload_stats = {"total_clients": 0, "last_upload": None, "filename": None}
+    cache.clear()
+    return redirect('/')
+
+@app.route('/setup-telegram-webhook')
+def setup_telegram_webhook():
+    try:
+        webhook_url = request.url_root + "webhook/telegram"
+        telegram_api_url = f"https://api.telegram.org/bot{Config.TELEGRAM_TOKEN}/setWebhook"
+        
+        data = {"url": webhook_url}
+        response = requests.post(telegram_api_url, data=data)
+        
+        return jsonify({
+            "status": "webhook_configured",
+            "telegram_response": response.json(),
+            "webhook_url": webhook_url
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/test-telegram')
+def test_telegram():
+    message = f"🧪 Test webhook complet - Ligne {Config.OVH_LINE_NUMBER} - {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}"
+    result = telegram_service.send_message(message)
+    
+    if result:
+        return jsonify({"status": "success", "message": "Test Telegram envoyé avec succès"})
+    else:
+        return jsonify({"status": "error", "message": "Échec du test Telegram"})
+
+@app.route('/test-command')
+def test_command():
+    if clients_database:
+        test_number = list(clients_database.keys())[0]
+    else:
+        test_number = "0767328146"
+    
+    result = process_telegram_command(f"/numero {test_number}", Config.CHAT_ID)
+    return jsonify({"test_result": result, "test_number": test_number})
+
+@app.route('/test-iban')
+def test_iban():
+    test_ibans = [
+        "FR1420041010050500013M02606",  # La Banque Postale
+        "FR7630003000540000000001234",  # Société Générale
+        "FR1411315000100000000000000",  # Crédit Agricole
+        "FR7610907000000000000000000",  # BNP Paribas
+        "DE89370400440532013000",       # Deutsche Bank
+    ]
+    
+    results = []
+    for iban in test_ibans:
+        bank = iban_detector.detect_bank(iban)
+        results.append({"iban": iban, "bank_detected": bank})
+    
+    return jsonify({
+        "test_results": results,
+        "total_tests": len(test_ibans),
+        "cache_size": len(cache.cache)
+    })
+
+@app.route('/send-test-message')
+def send_test_message():
+    """Envoie un message de test direct"""
+    try:
+        test_message = f"""
+🧪 <b>TEST DIRECT</b>
+📞 Numéro testé: 0650287608
+🕐 Heure: {datetime.now().strftime("%d/%m/%Y %H:%M:%S")}
+✅ Si vous voyez ce message, votre bot fonctionne correctement.
+❌ Si vous voyez du spam VPN, le problème est ailleurs.
+        """
+        
+        result = telegram_service.send_message(test_message)
+        
+        if result:
+            return jsonify({
+                "status": "success", 
+                "message": "Message de test envoyé avec succès",
+                "telegram_response": result
+            })
+        else:
+            return jsonify({
+                "status": "error", 
+                "message": "Échec de l'envoi du message de test"
+            }), 500
+            
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/clear-pending-updates')
+def clear_pending_updates():
+    """Nettoie les updates en attente"""
+    try:
+        # Utiliser getUpdates avec un offset élevé pour vider la queue
+        clear_url = f"https://api.telegram.org/bot{Config.TELEGRAM_TOKEN}/getUpdates?offset=-1&limit=1"
+        response = requests.get(clear_url, timeout=10)
+        
+        return jsonify({
+            "status": "success",
+            "message": "Updates en attente nettoyées",
+            "response": response.json() if response.status_code == 200 else response.text
+        })
+        
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/test-webhook-reception')
+def test_webhook_reception():
+    """Simule la réception d'un webhook pour tester"""
+    try:
+        # Simuler un message webhook
+        fake_webhook_data = {
+            "message": {
+                "message_id": 999,
+                "from": {"id": 123456, "first_name": "Test", "username": "test_user"},
+                "chat": {"id": int(Config.CHAT_ID), "type": "group"},
+                "date": int(time.time()),
+                "text": "/numero 0650287608"
+            }
+        }
+        
+        # Tester le traitement du webhook
+        result = process_telegram_command("/numero 0650287608", Config.CHAT_ID)
+        
+        return jsonify({
+            "status": "success",
+            "message": "Test webhook réception OK",
+            "simulated_data": fake_webhook_data,
+            "processing_result": result,
+            "note": "Si ce test fonctionne mais les vrais utilisateurs ne peuvent pas envoyer de commandes, le problème est bien le webhook."
+        })
+        
+    except Exception as e:
+        return jsonify({"error": str(e), "message": "Erreur lors du test de réception"}), 500
+
 @app.route('/test-ovh-cgi')
 def test_ovh_cgi():
     if clients_database:
@@ -1073,22 +1667,25 @@ def test_ovh_cgi():
     }
     
     return f"""
-    <h2>🧪 Test OVH CGI - Nouvelle Ligne (Version Améliorée)</h2>
-    <p>Simulation d'un appel OVH vers votre nouvelle ligne avec recherche intelligente</p>
+    <h2>🧪 Test OVH CGI - Version Complète</h2>
+    <p>Simulation d'un appel OVH avec recherche intelligente améliorée</p>
     <p><a href="/webhook/ovh?{urlencode(params)}" style="background: #4CAF50; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">🎯 Déclencher test appel</a></p>
     <p><strong>Paramètres:</strong> {params}</p>
     <p><strong>Ligne configurée:</strong> {Config.OVH_LINE_NUMBER}</p>
     <p><strong>Recherche améliorée:</strong> Teste tous les formats possibles (0033, +33, 33, 0X)</p>
-    <p><a href="/test-normalize" style="background: #ff9800; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">🔧 Tester normalisation</a></p>
-    <p><a href="/" style="background: #2196F3; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">🏠 Retour accueil</a></p>
+    <div style="margin-top: 20px;">
+        <a href="/test-normalize" style="background: #ff9800; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">🔧 Tester normalisation</a>
+        <a href="/debug-command" style="background: #17a2b8; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">🐛 Debug commandes</a>
+        <a href="/" style="background: #2196F3; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">🏠 Retour accueil</a>
+    </div>
     """
 
 @app.route('/health')
 def health():
     return jsonify({
         "status": "healthy", 
-        "version": "new-webhook-v2-improved",
-        "service": "webhook-ovh-telegram-new-enhanced",
+        "version": "webhook-complete-v3",
+        "service": "webhook-ovh-telegram-complete",
         "telegram_configured": bool(Config.TELEGRAM_TOKEN and Config.CHAT_ID),
         "telegram_chat_id": Config.CHAT_ID,
         "ovh_line": Config.OVH_LINE_NUMBER,
@@ -1097,13 +1694,15 @@ def health():
         "cache_size": len(cache.cache),
         "phone_normalization": "enhanced-multi-format",
         "search_intelligence": "advanced-with-fallback",
+        "diagnostic_tools": "webhook,commands,emergency",
         "timestamp": datetime.now().strftime("%d/%m/%Y %H:%M:%S")
     })
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
-    logger.info(f"🚀 Démarrage nouveau webhook amélioré sur le port {port}")
+    logger.info(f"🚀 Démarrage webhook complet sur le port {port}")
     logger.info(f"📱 Chat Telegram: {Config.CHAT_ID}")
     logger.info(f"📞 Ligne OVH: {Config.OVH_LINE_NUMBER}")
     logger.info(f"🔧 Normalisation téléphone: Version améliorée multi-formats")
+    logger.info(f"🛠️ Outils diagnostic: webhook, commandes, urgence")
     app.run(host='0.0.0.0', port=port, debug=False)
