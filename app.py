@@ -31,7 +31,7 @@ app.secret_key = 'webhook-ovh-secret-key-v2'
 class Config:
     # Nouveau Telegram
     TELEGRAM_TOKEN = os.environ.get('TELEGRAM_TOKEN', '7686188729:AAFRg44Twm7Ph_eE3yTfKoNO2Oqee3hmFBA')
-    CHAT_ID = os.environ.get('CHAT_ID', '-1002412784688')
+    CHAT_ID = os.environ.get('CHAT_ID', '-1002567065407')
     
     # Nouvelle ligne OVH
     OVH_LINE_NUMBER = '0033185093039'
