@@ -265,7 +265,7 @@ class TelegramService:
 telegram_service = TelegramService(Config.TELEGRAM_TOKEN, Config.CHAT_ID)
 
 # ===================================================================
-# GESTION CLIENTS ET DONNÉES
+# GESTION CLIENTS ET DONNÉES - VERSION AMÉLIORÉE
 # ===================================================================
 
 clients_database = {}
@@ -276,26 +276,116 @@ upload_stats = {
 }
 
 def normalize_phone(phone):
+    """Normalisation avancée des numéros de téléphone - Version Améliorée"""
     if not phone:
         return None
     
+    # Supprimer tous les caractères non numériques sauf +
     cleaned = re.sub(r'[^\d+]', '', str(phone))
     
+    # Patterns de normalisation étendus
     patterns = [
-        (r'^\+33(\d{9})$', lambda m: '0' + m.group(1)),
-        (r'^33(\d{9})$', lambda m: '0' + m.group(1)),
-        (r'^0(\d{9})$', lambda m: '0' + m.group(1)),
-        (r'^(\d{10})$', lambda m: m.group(1)),
+        # Format international avec 0033
+        (r'^0033(\d{9})$', lambda m: '0' + m.group(1)),        # 0033123456789 -> 0123456789
+        # Format international avec +33
+        (r'^\+33(\d{9})$', lambda m: '0' + m.group(1)),        # +33123456789 -> 0123456789
+        # Format international sans + avec 33
+        (r'^33(\d{9})$', lambda m: '0' + m.group(1)),          # 33123456789 -> 0123456789
+        # Format national français
+        (r'^0(\d{9})$', lambda m: '0' + m.group(1)),           # 0123456789 -> 0123456789
+        # Format sans indicatif
+        (r'^(\d{9})$', lambda m: '0' + m.group(1)),            # 123456789 -> 0123456789
+        # Format 10 chiffres commençant par 0
+        (r'^(\d{10})$', lambda m: m.group(1) if m.group(1).startswith('0') else '0' + m.group(1)[1:] if len(m.group(1)) == 10 else None),
     ]
     
     for pattern, transform in patterns:
         match = re.match(pattern, cleaned)
         if match:
             result = transform(match)
-            if len(result) == 10 and result.startswith('0'):
+            if result and len(result) == 10 and result.startswith('0'):
                 return result
     
     return None
+
+def get_client_info_advanced(phone_number):
+    """Recherche client avec normalisation multiple et recherche intelligente"""
+    if not phone_number:
+        return create_unknown_client(phone_number)
+    
+    # Liste des formats à essayer
+    search_formats = []
+    
+    # 1. Normalisation standard
+    normalized = normalize_phone(phone_number)
+    if normalized:
+        search_formats.append(normalized)
+    
+    # 2. Formats alternatifs du numéro entrant
+    cleaned = re.sub(r'[^\d+]', '', str(phone_number))
+    
+    # Générer tous les formats possibles
+    if cleaned.startswith('0033'):
+        # 0033123456789 -> essayer 0123456789, +33123456789, 33123456789
+        national = '0' + cleaned[4:]
+        search_formats.extend([national, '+33' + cleaned[4:], '33' + cleaned[4:]])
+    elif cleaned.startswith('+33'):
+        # +33123456789 -> essayer 0123456789, 0033123456789, 33123456789
+        national = '0' + cleaned[3:]
+        search_formats.extend([national, '0033' + cleaned[3:], '33' + cleaned[3:]])
+    elif cleaned.startswith('33') and len(cleaned) == 11:
+        # 33123456789 -> essayer 0123456789, +33123456789, 0033123456789
+        national = '0' + cleaned[2:]
+        search_formats.extend([national, '+33' + cleaned[2:], '0033' + cleaned[2:]])
+    elif cleaned.startswith('0') and len(cleaned) == 10:
+        # 0123456789 -> essayer +33123456789, 0033123456789, 33123456789
+        without_zero = cleaned[1:]
+        search_formats.extend(['+33' + without_zero, '0033' + without_zero, '33' + without_zero])
+    
+    # Supprimer les doublons et garder l'ordre
+    search_formats = list(dict.fromkeys(search_formats))
+    
+    # 3. Recherche exacte avec tous les formats
+    for format_to_try in search_formats:
+        if format_to_try in clients_database:
+            client = clients_database[format_to_try].copy()
+            # Mise à jour statistiques
+            clients_database[format_to_try]["nb_appels"] += 1
+            clients_database[format_to_try]["dernier_appel"] = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+            logger.info(f"✅ Client trouvé avec format: {format_to_try} (original: {phone_number})")
+            return client
+    
+    # 4. Recherche partielle (derniers 9 chiffres)
+    for format_to_try in search_formats:
+        if len(format_to_try) >= 9:
+            suffix = format_to_try[-9:]
+            for tel, client in clients_database.items():
+                if tel.endswith(suffix):
+                    client_copy = client.copy()
+                    clients_database[tel]["nb_appels"] += 1
+                    clients_database[tel]["dernier_appel"] = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+                    logger.info(f"✅ Client trouvé par suffixe: {tel} (original: {phone_number}, suffixe: {suffix})")
+                    return client_copy
+    
+    # 5. Recherche par suffixe du numéro original
+    if len(cleaned) >= 9:
+        original_suffix = cleaned[-9:]
+        for tel, client in clients_database.items():
+            tel_cleaned = re.sub(r'[^\d]', '', tel)
+            if tel_cleaned.endswith(original_suffix):
+                client_copy = client.copy()
+                clients_database[tel]["nb_appels"] += 1
+                clients_database[tel]["dernier_appel"] = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+                logger.info(f"✅ Client trouvé par suffixe original: {tel} (original: {phone_number})")
+                return client_copy
+    
+    # 6. Client inconnu
+    logger.warning(f"❌ Client non trouvé pour: {phone_number} (formats essayés: {search_formats})")
+    return create_unknown_client(phone_number)
+
+def get_client_info(phone_number):
+    """Fonction wrapper pour compatibilité - utilise la version avancée"""
+    return get_client_info_advanced(phone_number)
 
 def load_clients_from_csv(file_content):
     global clients_database, upload_stats
@@ -365,29 +455,6 @@ def load_clients_from_csv(file_content):
     except Exception as e:
         logger.error(f"Erreur lecture CSV: {str(e)}")
         raise ValueError(f"Erreur lecture CSV: {str(e)}")
-
-def get_client_info(phone_number):
-    normalized_number = normalize_phone(phone_number)
-    
-    if not normalized_number:
-        return create_unknown_client(phone_number)
-    
-    if normalized_number in clients_database:
-        client = clients_database[normalized_number].copy()
-        clients_database[normalized_number]["nb_appels"] += 1
-        clients_database[normalized_number]["dernier_appel"] = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
-        return client
-    
-    if len(normalized_number) >= 9:
-        suffix = normalized_number[-9:]
-        for tel, client in clients_database.items():
-            if tel.endswith(suffix):
-                client_copy = client.copy()
-                clients_database[tel]["nb_appels"] += 1
-                clients_database[tel]["dernier_appel"] = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
-                return client_copy
-    
-    return create_unknown_client(phone_number)
 
 def create_unknown_client(phone_number):
     return {
@@ -488,11 +555,12 @@ def process_telegram_command(message_text, chat_id):
         return {"error": str(e)}
 
 # ===================================================================
-# ROUTES WEBHOOK
+# ROUTES WEBHOOK - VERSION AMÉLIORÉE
 # ===================================================================
 
 @app.route('/webhook/ovh', methods=['POST', 'GET'])
 def ovh_webhook():
+    """Webhook pour recevoir les appels OVH - Version avec recherche améliorée"""
     try:
         timestamp = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
         
@@ -510,12 +578,21 @@ def ovh_webhook():
             
             logger.info(f"🔔 [{timestamp}] Appel JSON: {json.dumps(data, indent=2)}")
         
-        client_info = get_client_info(caller_number)
+        # Recherche client avec normalisation avancée
+        client_info = get_client_info_advanced(caller_number)
         
+        # Message Telegram formaté
         telegram_message = telegram_service.format_client_message(client_info, context="appel")
         telegram_message += f"\n📊 Statut appel: {call_status}"
         telegram_message += f"\n🔗 Source: OVH"
         
+        # Log pour debug
+        if client_info['statut'] != "Non référencé":
+            logger.info(f"✅ Fiche trouvée pour {caller_number}: {client_info['nom']} {client_info['prenom']}")
+        else:
+            logger.warning(f"❌ Aucune fiche trouvée pour {caller_number}")
+        
+        # Envoi vers Telegram
         telegram_result = telegram_service.send_message(telegram_message)
         
         return jsonify({
@@ -528,7 +605,7 @@ def ovh_webhook():
             "client_status": client_info['statut'],
             "bank_detected": client_info.get('banque', 'N/A') not in ['N/A', ''],
             "source": "OVH-CGI" if request.method == 'GET' else "OVH-JSON",
-            "line_number": Config.OVH_LINE_NUMBER
+            "formats_tried": "multiple_international_formats"
         })
         
     except Exception as e:
@@ -592,19 +669,28 @@ def home():
         code { background: #f4f4f4; padding: 2px 6px; border-radius: 3px; }
         .info-box { background: #e8f5e8; padding: 15px; border-radius: 8px; margin: 10px 0; }
         .new-config { background: #e1f5fe; border-left: 4px solid #2196F3; padding: 15px; margin: 20px 0; }
+        .improved-feature { background: #fff3e0; border-left: 4px solid #ff9800; padding: 15px; margin: 20px 0; }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1>🤖 Nouveau Webhook OVH-Telegram</h1>
+            <h1>🤖 Nouveau Webhook OVH-Telegram (Version Améliorée)</h1>
             <div class="new-config">
                 <strong>🆕 NOUVELLE CONFIGURATION :</strong><br>
                 📱 Chat Telegram: <code>{{ chat_id }}</code><br>
                 📞 Ligne OVH: <code>{{ ovh_line }}</code><br>
                 🤖 Bot: <code>{{ bot_token[:10] }}...</code>
             </div>
-            <p class="success">✅ Serveur actif - Bot configuré</p>
+            <div class="improved-feature">
+                <strong>🚀 AMÉLIORATIONS DE CETTE VERSION :</strong><br>
+                ✅ Normalisation téléphone super robuste (0033, +33, 33, 0X formats)<br>
+                ✅ Recherche intelligente multi-formats avec fallback<br>
+                ✅ Détection automatique par suffixes (9 derniers chiffres)<br>
+                ✅ Logs détaillés pour traçabilité<br>
+                ✅ Route de test pour la normalisation
+            </div>
+            <p class="success">✅ Serveur actif - Bot configuré avec recherche avancée</p>
         </div>
 
         <div class="stats">
@@ -657,6 +743,7 @@ def home():
             <a href="/test-telegram" class="btn">📧 Test Telegram</a>
             <a href="/test-command" class="btn">🎯 Test /numero</a>
             <a href="/test-iban" class="btn">🏦 Test détection IBAN</a>
+            <a href="/test-normalize" class="btn">🔧 Test normalisation</a>
             <a href="/test-ovh-cgi" class="btn">📞 Test appel OVH</a>
             <a href="/clear-clients" class="btn btn-danger" onclick="return confirm('Effacer tous les clients ?')">🗑️ Vider base</a>
         </div>
@@ -671,7 +758,7 @@ def home():
 
         <h2>📱 Commandes Telegram disponibles</h2>
         <ul>
-            <li><code>/numero 0123456789</code> - Affiche fiche client complète</li>
+            <li><code>/numero 0123456789</code> - Affiche fiche client complète (recherche intelligente)</li>
             <li><code>/iban FR76XXXXXXXXX</code> - Détecte la banque depuis l'IBAN</li>
             <li><code>/stats</code> - Statistiques de la campagne</li>
             <li><code>/help</code> - Aide et liste des commandes</li>
@@ -686,18 +773,20 @@ def home():
                 <li>✅ Chaque appel entrant affiche automatiquement la fiche client dans Telegram</li>
                 <li>🔍 Utilisez <code>/numero XXXXXXXXXX</code> pour rechercher un client</li>
                 <li>🆕 Utilisez <code>/iban FR76XXXXX</code> pour tester la détection de banque</li>
+                <li>🔧 Utilisez <code>/test-normalize</code> pour tester les formats de numéros</li>
             </ol>
         </div>
         
-        <div class="new-config">
-            <h3>🆕 Spécificités de cette version :</h3>
+        <div class="improved-feature">
+            <h3>🚀 Spécificités de cette version améliorée :</h3>
             <ul>
-                <li>✅ Configuration dédiée à votre nouveau canal Telegram</li>
-                <li>✅ Ligne OVH spécifique : {{ ovh_line }}</li>
-                <li>✅ Code optimisé et allégé</li>
-                <li>✅ Prêt pour déploiement sur nouvel hébergeur</li>
-                <li>✅ Conservation de toutes les fonctionnalités principales</li>
-                <li>✅ Détection automatique IBAN via APIs</li>
+                <li>✅ Recherche super intelligente : essaie tous les formats possibles</li>
+                <li>✅ Support 0033XXXXXXXXX, +33XXXXXXXXX, 33XXXXXXXXX, 0XXXXXXXXX</li>
+                <li>✅ Recherche par suffixes (9 derniers chiffres) en fallback</li>
+                <li>✅ Logs détaillés pour debugging et traçabilité</li>
+                <li>✅ Route de test dédiée pour vérifier la normalisation</li>
+                <li>✅ Gestion des doublons et formats multiples</li>
+                <li>✅ Compatibilité totale avec l'existant</li>
             </ul>
         </div>
     </div>
@@ -926,6 +1015,50 @@ def test_iban():
         "cache_size": len(cache.cache)
     })
 
+# Nouvelle route de test pour la normalisation
+@app.route('/test-normalize')
+def test_normalize():
+    """Test de normalisation des numéros"""
+    test_numbers = [
+        "0033745431189",  # Cas problématique mentionné
+        "+33745431189",
+        "33745431189", 
+        "0745431189",
+        "745431189",
+        "0033123456789",
+        "+33123456789",
+        "0123456789",
+        "123456789",
+        "33123456789"
+    ]
+    
+    results = []
+    for num in test_numbers:
+        normalized = normalize_phone(num)
+        client_found = None
+        if normalized and normalized in clients_database:
+            client_found = f"{clients_database[normalized]['prenom']} {clients_database[normalized]['nom']}"
+        
+        results.append({
+            "original": num,
+            "normalized": normalized,
+            "found_in_db": normalized in clients_database if normalized else False,
+            "client_found": client_found
+        })
+    
+    return jsonify({
+        "test_results": results,
+        "total_clients_in_db": len(clients_database),
+        "sample_numbers_in_db": list(clients_database.keys())[:5] if clients_database else [],
+        "normalization_patterns": [
+            "0033XXXXXXXXX -> 0XXXXXXXXX",
+            "+33XXXXXXXXX -> 0XXXXXXXXX", 
+            "33XXXXXXXXX -> 0XXXXXXXXX",
+            "XXXXXXXXX -> 0XXXXXXXXX",
+            "0XXXXXXXXX -> 0XXXXXXXXX"
+        ]
+    })
+
 @app.route('/test-ovh-cgi')
 def test_ovh_cgi():
     if clients_database:
@@ -940,11 +1073,13 @@ def test_ovh_cgi():
     }
     
     return f"""
-    <h2>🧪 Test OVH CGI - Nouvelle Ligne</h2>
-    <p>Simulation d'un appel OVH vers votre nouvelle ligne</p>
+    <h2>🧪 Test OVH CGI - Nouvelle Ligne (Version Améliorée)</h2>
+    <p>Simulation d'un appel OVH vers votre nouvelle ligne avec recherche intelligente</p>
     <p><a href="/webhook/ovh?{urlencode(params)}" style="background: #4CAF50; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">🎯 Déclencher test appel</a></p>
     <p><strong>Paramètres:</strong> {params}</p>
     <p><strong>Ligne configurée:</strong> {Config.OVH_LINE_NUMBER}</p>
+    <p><strong>Recherche améliorée:</strong> Teste tous les formats possibles (0033, +33, 33, 0X)</p>
+    <p><a href="/test-normalize" style="background: #ff9800; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">🔧 Tester normalisation</a></p>
     <p><a href="/" style="background: #2196F3; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">🏠 Retour accueil</a></p>
     """
 
@@ -952,20 +1087,23 @@ def test_ovh_cgi():
 def health():
     return jsonify({
         "status": "healthy", 
-        "version": "new-webhook-v2",
-        "service": "webhook-ovh-telegram-new",
+        "version": "new-webhook-v2-improved",
+        "service": "webhook-ovh-telegram-new-enhanced",
         "telegram_configured": bool(Config.TELEGRAM_TOKEN and Config.CHAT_ID),
         "telegram_chat_id": Config.CHAT_ID,
         "ovh_line": Config.OVH_LINE_NUMBER,
         "clients_loaded": upload_stats["total_clients"],
         "iban_detection": "API-enabled",
         "cache_size": len(cache.cache),
+        "phone_normalization": "enhanced-multi-format",
+        "search_intelligence": "advanced-with-fallback",
         "timestamp": datetime.now().strftime("%d/%m/%Y %H:%M:%S")
     })
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
-    logger.info(f"🚀 Démarrage nouveau webhook sur le port {port}")
+    logger.info(f"🚀 Démarrage nouveau webhook amélioré sur le port {port}")
     logger.info(f"📱 Chat Telegram: {Config.CHAT_ID}")
     logger.info(f"📞 Ligne OVH: {Config.OVH_LINE_NUMBER}")
+    logger.info(f"🔧 Normalisation téléphone: Version améliorée multi-formats")
     app.run(host='0.0.0.0', port=port, debug=False)
