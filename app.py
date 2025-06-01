@@ -939,6 +939,33 @@ def check_config():
         ]
     })
 
+# Route de debug simple
+@app.route('/debug')
+def debug():
+    return """
+    <html>
+    <head><title>🔍 Debug Webhook</title></head>
+    <body style="font-family: Arial; margin: 50px;">
+        <h1>🔍 Debug Webhook OVH-Stripe</h1>
+        <h2>✅ L'application fonctionne !</h2>
+        <p><strong>Variables d'environnement détectées :</strong></p>
+        <ul>
+            <li>TELEGRAM_TOKEN: {}</li>
+            <li>CHAT_ID: {}</li>
+            <li>STRIPE_SECRET_KEY: {}</li>
+            <li>STRIPE_BUY_BUTTON_ID: {}</li>
+        </ul>
+        <p><a href="/" style="background: #2196F3; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">🏠 Retour accueil</a></p>
+        <p><a href="/health" style="background: #4CAF50; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">🔍 Health Check</a></p>
+    </body>
+    </html>
+    """.format(
+        "✅ Configuré" if Config.TELEGRAM_TOKEN else "❌ Manquant",
+        "✅ Configuré" if Config.CHAT_ID else "❌ Manquant", 
+        "✅ Configuré" if Config.STRIPE_SECRET_KEY else "❌ Manquant",
+        Config.STRIPE_BUY_BUTTON_ID or "❌ Manquant"
+    )
+
 @app.route('/health')
 def health():
     is_valid, missing_vars = check_required_config()
@@ -2000,10 +2027,253 @@ def stripe_webhook():
 
 @app.route('/')
 def home():
-    auto_detected = len([c for c in clients_database.values() if c['banque'] not in ['N/A', ''] and c['iban']])
-    stripe_stats = stripe_service.get_payment_stats()
-    
-    return render_template_string("""
+    try:
+        # Calculs sécurisés avec gestion d'erreurs
+        auto_detected = 0
+        stripe_stats = {"total_payments": 0, "total_amount": 0}
+        
+        try:
+            auto_detected = len([c for c in clients_database.values() if c.get('banque', 'N/A') not in ['N/A', ''] and c.get('iban')])
+        except:
+            auto_detected = 0
+            
+        try:
+            if stripe_service and stripe_service.configured:
+                stripe_stats = stripe_service.get_payment_stats()
+                if isinstance(stripe_stats, dict) and 'error' not in stripe_stats:
+                    pass  # OK
+                else:
+                    stripe_stats = {"total_payments": 0, "total_amount": 0}
+        except:
+            stripe_stats = {"total_payments": 0, "total_amount": 0}
+        
+        return render_template_string("""
+<!DOCTYPE html>
+<html>
+<head>
+    <title>🤖 Webhook OVH-Telegram-Stripe SÉCURISÉ</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
+        .container { max-width: 1200px; margin: 0 auto; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .header { text-align: center; margin-bottom: 30px; }
+        .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin-bottom: 30px; }
+        .stat-card { background: #e3f2fd; padding: 20px; border-radius: 8px; text-align: center; }
+        .stripe-card { background: #e8f5e8; border-left: 4px solid #4caf50; }
+        .upload-section { background: #f0f4f8; padding: 20px; border-radius: 8px; margin-bottom: 20px; }
+        .btn { background: #2196F3; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; text-decoration: none; display: inline-block; margin: 5px; }
+        .btn:hover { background: #1976D2; }
+        .btn-danger { background: #f44336; }
+        .btn-success { background: #4CAF50; }
+        .btn-warning { background: #ff9800; }
+        .btn-info { background: #17a2b8; }
+        .btn-stripe { background: #6c5ce7; }
+        .links { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; }
+        .success { color: #4CAF50; font-weight: bold; }
+        .error { color: #f44336; font-weight: bold; }
+        code { background: #f4f4f4; padding: 2px 6px; border-radius: 3px; }
+        .info-box { background: #e8f5e8; padding: 15px; border-radius: 8px; margin: 10px 0; }
+        .config-section { background: #e1f5fe; border-left: 4px solid #2196F3; padding: 15px; margin: 20px 0; }
+        .stripe-section { background: #f3e5f5; border-left: 4px solid #9c27b0; padding: 15px; margin: 20px 0; }
+        .security-section { background: #e8f5e8; border-left: 4px solid #4caf50; padding: 15px; margin: 20px 0; }
+        .error-section { background: #ffebee; border-left: 4px solid #f44336; padding: 15px; margin: 20px 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🤖 Webhook OVH-Telegram-Stripe SÉCURISÉ</h1>
+            
+            {% if config_valid %}
+            <div class="config-section">
+                <strong>✅ CONFIGURATION TELEGRAM ACTIVE :</strong><br>
+                📱 Chat ID: <code>{{ chat_id }}</code><br>
+                📞 Ligne OVH: <code>{{ ovh_line }}</code><br>
+                🤖 Token: <code>{{ token_display }}</code><br>
+                🔒 Source: Variables d'environnement Heroku
+            </div>
+            {% else %}
+            <div class="error-section">
+                <strong>❌ CONFIGURATION TELEGRAM MANQUANTE :</strong><br>
+                Variables d'environnement manquantes dans Heroku Config Vars :<br>
+                • <code>TELEGRAM_TOKEN</code><br>
+                • <code>CHAT_ID</code><br>
+                <p><strong>🔧 Ajoutez ces variables dans Heroku → Settings → Config Vars</strong></p>
+            </div>
+            {% endif %}
+            
+            <div class="stripe-section">
+                <strong>💳 CONFIGURATION STRIPE :</strong><br>
+                {% if stripe_configured %}
+                ✅ Stripe configuré et opérationnel<br>
+                🔗 Buy Button ID: <code>{{ buy_button_id }}</code><br>
+                💰 Montant fixe: 4,999.00 €<br>
+                🔒 Webhook: {{ '✅ Configuré' if webhook_configured else '⚠️ À configurer' }}
+                {% else %}
+                ❌ Configuration Stripe manquante<br>
+                Variables requises: STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET
+                {% endif %}
+            </div>
+            
+            <div class="security-section">
+                <strong>🔒 SÉCURITÉ RENFORCÉE :</strong><br>
+                ✅ Aucun token hardcodé dans le code<br>
+                ✅ Configuration via variables d'environnement uniquement<br>
+                ✅ Vérification automatique de la configuration<br>
+                ✅ Protection contre les tokens compromis<br>
+                ✅ Webhooks Stripe sécurisés avec signature
+            </div>
+            
+            <p class="{{ 'success' if config_valid else 'error' }}">
+                {{ '✅ Application correctement configurée' if config_valid else '❌ Configuration requise' }}
+            </p>
+        </div>
+
+        <div class="stats">
+            <div class="stat-card">
+                <h3>👥 Clients chargés</h3>
+                <h2>{{ total_clients }}</h2>
+            </div>
+            <div class="stat-card">
+                <h3>🏦 Banques détectées</h3>
+                <h2>{{ auto_detected }}</h2>
+            </div>
+            <div class="stat-card stripe-card">
+                <h3>💳 Paiements Stripe</h3>
+                <h2>{{ stripe_total_payments }}</h2>
+                <p>{{ stripe_total_amount }}€ total</p>
+            </div>
+            <div class="stat-card">
+                <h3>📞 Ligne OVH</h3>
+                <p>{{ ovh_line }}</p>
+            </div>
+        </div>
+
+        <div class="upload-section">
+            <h2>📂 Upload fichier clients (CSV uniquement)</h2>
+            <form action="/upload" method="post" enctype="multipart/form-data">
+                <div class="info-box">
+                    <p><strong>📋 Format supporté:</strong> CSV (.csv)</p>
+                    <p><strong>🔥 Colonne obligatoire:</strong> <code>telephone</code> (ou tel, phone, numero)</p>
+                    <p><strong>✨ Colonnes optionnelles:</strong></p>
+                    <ul style="text-align: left; max-width: 800px; margin: 0 auto;">
+                        <li><strong>Identité:</strong> nom, prenom, sexe, date_naissance, lieu_naissance</li>
+                        <li><strong>Contact:</strong> email, adresse, ville, code_postal</li>
+                        <li><strong>Professionnel:</strong> entreprise, profession</li>
+                        <li><strong>Bancaire:</strong> banque, swift, iban</li>
+                        <li><strong>Divers:</strong> statut, situation_familiale</li>
+                    </ul>
+                    <div style="background: #fff3e0; padding: 10px; margin-top: 10px; border-radius: 5px;">
+                        <strong>🌐 AUTO-DÉTECTION BANQUE :</strong> Si la colonne <code>banque</code> est vide mais qu'un <code>iban</code> est présent, la banque sera automatiquement détectée via APIs !
+                    </div>
+                    <div style="background: #f3e5f5; padding: 10px; margin-top: 10px; border-radius: 5px;">
+                        <strong>💳 STRIPE INTEGRATION :</strong> Avec un <code>email</code> valide, les liens de paiement 4,999€ seront automatiquement disponibles !
+                    </div>
+                </div>
+                <input type="file" name="file" accept=".csv" required style="margin: 10px 0;">
+                <br>
+                <button type="submit" class="btn btn-success">📁 Charger fichier CSV</button>
+            </form>
+        </div>
+
+        <h2>🔧 Tests & Configuration</h2>
+        <div class="links">
+            <a href="/clients" class="btn">👥 Voir clients</a>
+            <a href="/test-telegram" class="btn">📧 Test Telegram</a>
+            <a href="/test-command" class="btn">🎯 Test /numero</a>
+            <a href="/test-payment" class="btn btn-stripe">💳 Test paiement</a>
+            <a href="/stripe-dashboard" class="btn btn-stripe">📊 Dashboard Stripe</a>
+            <a href="/check-webhook-config" class="btn btn-danger">🔗 Diagnostic Webhook</a>
+            <a href="/fix-webhook-now" class="btn btn-success">🔧 Corriger Webhook</a>
+            <a href="/test-iban" class="btn">🏦 Test détection IBAN</a>
+            <a href="/test-normalize" class="btn btn-info">🔧 Test Normalisation</a>
+            <a href="/test-ovh-cgi" class="btn">📞 Test appel OVH</a>
+            <a href="/clear-clients" class="btn btn-danger" onclick="return confirm('Effacer tous les clients ?')">🗑️ Vider base</a>
+        </div>
+
+        <h2>🔗 Configuration OVH CTI</h2>
+        <div class="info-box">
+            <p><strong>URL CGI à configurer dans l'interface OVH :</strong></p>
+            <code>{{ webhook_url }}/webhook/ovh?caller=*CALLING*&callee=*CALLED*&type=*EVENT*</code>
+            <br><br>
+            <p><strong>🎯 Remplacez par votre URL Heroku réelle</strong></p>
+        </div>
+
+        <h2>🔗 Configuration Webhook Stripe</h2>
+        <div class="info-box">
+            <p><strong>URL Webhook à configurer dans Stripe Dashboard :</strong></p>
+            <code>{{ webhook_url }}/webhook/stripe</code>
+            <br><br>
+            <p><strong>📋 Événements à sélectionner :</strong></p>
+            <ul style="text-align: left;">
+                <li><code>payment_intent.succeeded</code> - Paiement réussi</li>
+                <li><code>payment_intent.payment_failed</code> - Paiement échoué</li>
+            </ul>
+        </div>
+
+        <h2>📱 Commandes Telegram disponibles</h2>
+        <ul>
+            <li><code>/numero 0123456789</code> - Affiche fiche client complète (recherche intelligente)</li>
+            <li><code>/paiement 0123456789</code> - Génère un lien de paiement 4,999€ pour le client</li>
+            <li><code>/iban FR76XXXXXXXXX</code> - Détecte la banque depuis l'IBAN</li>
+            <li><code>/stripe_stats</code> - Statistiques des paiements Stripe</li>
+            <li><code>/stats</code> - Statistiques complètes de la campagne</li>
+            <li><code>/help</code> - Aide et liste des commandes</li>
+        </ul>
+
+        <div class="security-section">
+            <h3>🔒 Avantages de cette version sécurisée :</h3>
+            <ul>
+                <li>✅ <strong>Zéro token hardcodé</strong> - impossible de voler depuis le code source</li>
+                <li>✅ <strong>Configuration Heroku uniquement</strong> - variables d'environnement sécurisées</li>
+                <li>✅ <strong>Vérification automatique</strong> - détecte les configurations manquantes</li>
+                <li>✅ <strong>Recherche téléphone avancée</strong> - tous formats (0033, +33, 33, 0X)</li>
+                <li>✅ <strong>Détection IBAN automatique</strong> - via APIs multiples</li>
+                <li>✅ <strong>Intégration Stripe complète</strong> - liens de paiement automatiques</li>
+                <li>✅ <strong>Webhooks sécurisés</strong> - signature Stripe vérifiée</li>
+                <li>✅ <strong>Diagnostic complet</strong> - résolution automatique des problèmes</li>
+                <li>✅ <strong>Interface complète</strong> - gestion et tests intégrés</li>
+            </ul>
+        </div>
+    </div>
+</body>
+</html>
+        """, 
+        # Variables sécurisées
+        config_valid=config_valid,
+        total_clients=upload_stats.get("total_clients", 0),
+        auto_detected=auto_detected,
+        stripe_configured=stripe_service.configured if stripe_service else False,
+        stripe_total_payments=stripe_stats.get('total_payments', 0),
+        stripe_total_amount=f"{stripe_stats.get('total_amount', 0):.2f}",
+        webhook_configured=bool(Config.STRIPE_WEBHOOK_SECRET),
+        buy_button_id=Config.STRIPE_BUY_BUTTON_ID or "buy_btn_1RUzUoC8opMymz5GeubkCCp2",
+        chat_id=Config.CHAT_ID or "Non configuré",
+        ovh_line=Config.OVH_LINE_NUMBER or "0033185093039",
+        token_display=f"{Config.TELEGRAM_TOKEN[:10]}...{Config.TELEGRAM_TOKEN[-5:]}" if Config.TELEGRAM_TOKEN else "Non configuré",
+        webhook_url=request.url_root.rstrip('/')
+        )
+        
+    except Exception as e:
+        # Page d'erreur simple en cas de problème
+        logger.error(f"❌ Erreur page d'accueil: {str(e)}")
+        return f"""
+        <html>
+        <head><title>❌ Erreur Webhook</title></head>
+        <body style="font-family: Arial; margin: 50px; text-align: center;">
+            <h1>❌ Erreur de chargement</h1>
+            <p><strong>Erreur:</strong> {str(e)}</p>
+            <p><strong>Solution:</strong></p>
+            <ul style="text-align: left; max-width: 600px; margin: 0 auto;">
+                <li>Vérifiez les logs Heroku: <code>heroku logs --tail</code></li>
+                <li>Vérifiez les variables d'environnement</li>
+                <li>Redéployez l'application</li>
+            </ul>
+            <p><a href="/health" style="background: #2196F3; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">🔍 Check Health</a></p>
+        </body>
+        </html>
+        """
 <!DOCTYPE html>
 <html>
 <head>
