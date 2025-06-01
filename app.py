@@ -16,7 +16,36 @@
         </ul>
 
         <div class="security-section">
-            <h3>🔒 Avantages de cette version sécurisée :</h3>
+            <ul>
+                <li>✅ <strong>Zéro token hardcodé</strong> - impossible de voler depuis le code source</li>
+                <li>✅ <strong>Configuration Heroku uniquement</strong> - variables d'environnement sécurisées</li>
+                <li>✅ <strong>Vérification automatique</strong> - détecte les configurations manquantes</li>
+                <li>✅ <strong>Recherche téléphone avancée</strong> - tous formats (0033, +33, 33, 0X)</li>
+                <li>✅ <strong>Détection IBAN automatique</strong> - via APIs multiples</li>
+                <li>✅ <strong>Intégration Stripe complète</strong> - liens de paiement automatiques</li>
+                <li>✅ <strong>Webhooks sécurisés</strong> - signature Stripe vérifiée</li>
+                <li>✅ <strong>Diagnostic complet</strong> - résolution automatique des problèmes</li>
+                <li>✅ <strong>Interface complète</strong> - gestion et tests intégrés</li>
+            </ul>
+        </div>
+    </div>
+</body>
+</html>
+    """, 
+    config_valid=config_valid,
+    total_clients=upload_stats["total_clients"],
+    auto_detected=auto_detected,
+    stripe_configured=stripe_service.configured,
+    stripe_total_payments=stripe_stats.get('total_payments', 0),
+    stripe_total_amount=f"{stripe_stats.get('total_amount', 0):.2f}",
+    webhook_configured=bool(Config.STRIPE_WEBHOOK_SECRET),
+    buy_button_id=Config.STRIPE_BUY_BUTTON_ID,
+    chat_id=Config.CHAT_ID,
+    ovh_line=Config.OVH_LINE_NUMBER,
+    token_display=f"{Config.TELEGRAM_TOKEN[:10]}...{Config.TELEGRAM_TOKEN[-5:]}" if Config.TELEGRAM_TOKEN else "Non configuré",
+    missing_vars=['TELEGRAM_TOKEN', 'CHAT_ID'] if not config_valid else [],
+    webhook_url=request.url_root.rstrip('/')
+    )
             <ul>
                 <li>✅ <strong>Zéro token hardcodé</strong> - impossible de voler depuis le code source</li>
                 <li>✅ <strong>Configuration Heroku uniquement</strong> - variables d'environnement sécurisées</li>
