@@ -1,12 +1,3 @@
-            <p><strong>📋 Événements à sélectionner :</strong></p>
-            <ul style="text-align: left;">
-                <li><code>payment_intent.succeeded</code> - Paiement réussi</li>
-                <li><code>payment_intent.payment_failed</code> - Paiement échoué</li>
-            </ul>
-        </div>
-
-        <h2>📱 Commandes Telegram disponibles</h2>
-        <ul>
             <li><code>/numero 0123456789</code> - Affiche fiche client complète (recherche intelligente)</li>
             <li><code>/paiement 0123456789</code> - Génère un lien de paiement 4,999€ pour le client</li>
             <li><code>/iban FR76XXXXXXXXX</code> - Détecte la banque depuis l'IBAN</li>
@@ -16,6 +7,7 @@
         </ul>
 
         <div class="security-section">
+            <h3>🔒 Avantages de cette version sécurisée :</h3>
             <ul>
                 <li>✅ <strong>Zéro token hardcodé</strong> - impossible de voler depuis le code source</li>
                 <li>✅ <strong>Configuration Heroku uniquement</strong> - variables d'environnement sécurisées</li>
@@ -40,36 +32,7 @@
     stripe_total_amount=f"{stripe_stats.get('total_amount', 0):.2f}",
     webhook_configured=bool(Config.STRIPE_WEBHOOK_SECRET),
     buy_button_id=Config.STRIPE_BUY_BUTTON_ID,
-    chat_id=Config.CHAT_ID,
-    ovh_line=Config.OVH_LINE_NUMBER,
-    token_display=f"{Config.TELEGRAM_TOKEN[:10]}...{Config.TELEGRAM_TOKEN[-5:]}" if Config.TELEGRAM_TOKEN else "Non configuré",
-    missing_vars=['TELEGRAM_TOKEN', 'CHAT_ID'] if not config_valid else [],
-    webhook_url=request.url_root.rstrip('/')
-    )
-            <ul>
-                <li>✅ <strong>Zéro token hardcodé</strong> - impossible de voler depuis le code source</li>
-                <li>✅ <strong>Configuration Heroku uniquement</strong> - variables d'environnement sécurisées</li>
-                <li>✅ <strong>Vérification automatique</strong> - détecte les configurations manquantes</li>
-                <li>✅ <strong>Recherche téléphone avancée</strong> - tous formats (0033, +33, 33, 0X)</li>
-                <li>✅ <strong>Détection IBAN automatique</strong> - via APIs multiples</li>
-                <li>✅ <strong>Intégration Stripe complète</strong> - liens de paiement automatiques</li>
-                <li>✅ <strong>Webhooks sécurisés</strong> - signature Stripe vérifiée</li>
-                <li>✅ <strong>Diagnostic complet</strong> - résolution automatique des problèmes</li>
-                <li>✅ <strong>Interface complète</strong> - gestion et tests intégrés</li>
-            </ul>
-        </div>
-    </div>
-</body>
-</html>
-    """, 
-    config_valid=config_valid,
-    total_clients=upload_stats["total_clients"],
-    auto_detected=auto_detected,
-    stripe_configured=stripe_service.configured,
-    stripe_total_payments=stripe_stats.get('total_payments', 0),
-    stripe_total_amount=f"{stripe_stats.get('total_amount', 0):.2f}",
-    webhook_configured=bool(Config.STRIPE_WEBHOOK_SECRET),
-    buy_button_id=Config.STRIPE_BUY_BUTTON_ID,
+    clients_with_email=clients_with_email,
     chat_id=Config.CHAT_ID,
     ovh_line=Config.OVH_LINE_NUMBER,
     token_display=f"{Config.TELEGRAM_TOKEN[:10]}...{Config.TELEGRAM_TOKEN[-5:]}" if Config.TELEGRAM_TOKEN else "Non configuré",
@@ -78,8 +41,260 @@
     )
 
 # ===================================================================
-# ROUTES DE TEST ET UTILITAIRES AVEC STRIPE
+# ROUTES DE TEST AVEC STRIPE
 # ===================================================================
+
+@app.route('/test-payment')
+def test_payment():
+    """Page de test pour les paiements Stripe"""
+    if not stripe_service.configured:
+        return jsonify({"error": "Stripe non configuré"}), 400
+    
+    # Trouver un client avec email pour le test
+    test_client = None
+    for phone, client in clients_database.items():
+        if client['email'] not in ['N/A', '']:
+            test_client = (phone, client)
+            break
+    
+    if test_client:
+        test_payment_url, _ = stripe_service.generate_payment_link(test_client[1]['email'])
+    else:
+        test_payment_url = f"https://buy.stripe.com/{Config.STRIPE_BUY_BUTTON_ID}?prefilled_email=test@example.com"
+    
+    return render_template_string("""
+<!DOCTYPE html>
+<html>
+<head>
+    <title>🧪 Test Paiement Stripe</title>
+    <meta charset="UTF-8">
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
+        .container { max-width: 800px; margin: 0 auto; background: white; padding: 20px; border-radius: 10px; }
+        .btn { background: #6c5ce7; color: white; padding: 15px 30px; border: none; cursor: pointer; border-radius: 5px; margin: 10px; text-decoration: none; display: inline-block; font-size: 16px; }
+        .btn:hover { background: #5f3dc4; }
+        .btn-success { background: #4CAF50; }
+        .test-section { background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0; }
+        code { background: #f4f4f4; padding: 2px 6px; border-radius: 3px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Test Paiement Stripe - Sécurisation de Fonds</h1>
+        
+        <div class="test-section">
+            <h2>💳 Configuration actuelle</h2>
+            <p><strong>Buy Button ID:</strong> <code>{{ buy_button_id }}</code></p>
+            <p><strong>Montant:</strong> 4,999.00 €</p>
+            <p><strong>Stripe configuré:</strong> {{ '✅ Oui' if stripe_configured else '❌ Non' }}</p>
+            <p><strong>Webhook configuré:</strong> {{ '✅ Oui' if webhook_configured else '❌ Non' }}</p>
+        </div>
+        
+        {% if test_client %}
+        <div class="test-section">
+            <h2>🎯 Test avec client réel</h2>
+            <p><strong>Client:</strong> {{ test_client[1].prenom }} {{ test_client[1].nom }}</p>
+            <p><strong>Téléphone:</strong> {{ test_client[0] }}</p>
+            <p><strong>Email:</strong> {{ test_client[1].email }}</p>
+            
+            <a href="{{ test_payment_url }}" target="_blank" class="btn">
+                💳 TESTER PAIEMENT 4,999€
+            </a>
+        </div>
+        {% else %}
+        <div class="test-section">
+            <h2>🎯 Test générique</h2>
+            <p>Aucun client avec email trouvé dans la base</p>
+            <a href="{{ test_payment_url }}" target="_blank" class="btn">
+                💳 TESTER PAIEMENT 4,999€
+            </a>
+        </div>
+        {% endif %}
+        
+        <div style="text-align: center; margin: 30px 0;">
+            <a href="/" class="btn btn-success">🏠 Accueil</a>
+        </div>
+    </div>
+</body>
+</html>
+    """,
+    buy_button_id=Config.STRIPE_BUY_BUTTON_ID,
+    stripe_configured=stripe_service.configured,
+    webhook_configured=bool(Config.STRIPE_WEBHOOK_SECRET),
+    test_client=test_client,
+    test_payment_url=test_payment_url
+    )
+
+@app.route('/stripe-dashboard')
+def stripe_dashboard():
+    """Dashboard Stripe simple"""
+    if not stripe_service.configured:
+        return jsonify({"error": "Stripe non configuré"}), 400
+    
+    try:
+        stats = stripe_service.get_payment_stats()
+        clients_with_email = {k: v for k, v in clients_database.items() if v['email'] not in ['N/A', '']}
+        
+        return render_template_string("""
+<!DOCTYPE html>
+<html>
+<head>
+    <title>💳 Dashboard Stripe</title>
+    <meta charset="UTF-8">
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
+        .container { max-width: 1000px; margin: 0 auto; background: white; padding: 20px; border-radius: 10px; }
+        .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin: 20px 0; }
+        .stat-card { background: #f8f9fa; padding: 20px; border-radius: 8px; text-align: center; border-left: 4px solid #6c5ce7; }
+        .btn { background: #6c5ce7; color: white; padding: 10px 20px; border: none; cursor: pointer; border-radius: 5px; margin: 5px; text-decoration: none; display: inline-block; }
+        .client-list { background: #f0f4f8; padding: 20px; border-radius: 8px; margin: 20px 0; }
+        code { background: #f4f4f4; padding: 2px 6px; border-radius: 3px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>💳 Dashboard Stripe - Sécurisation de Fonds</h1>
+        
+        <div class="stats">
+            <div class="stat-card">
+                <h3>💰 Paiements</h3>
+                <h2>{{ stats.get('total_payments', 0) }}</h2>
+            </div>
+            <div class="stat-card">
+                <h3>💵 Total</h3>
+                <h2>{{ "%.2f"|format(stats.get('total_amount', 0)) }} €</h2>
+            </div>
+            <div class="stat-card">
+                <h3>📊 Moyenne</h3>
+                <h2>{{ "%.2f"|format(stats.get('average_amount', 0)) }} €</h2>
+            </div>
+        </div>
+        
+        <div class="client-list">
+            <h2>👥 Clients prêts pour les paiements ({{ clients_count }})</h2>
+            {% if clients_with_email %}
+                {% for phone, client in clients_with_email %}
+                <div style="background: white; padding: 10px; margin: 10px 0; border-radius: 5px;">
+                    <strong>{{ client.prenom }} {{ client.nom }}</strong><br>
+                    📞 {{ phone }} | 📧 {{ client.email }}
+                </div>
+                {% endfor %}
+            {% else %}
+                <p>Aucun client avec email configuré</p>
+            {% endif %}
+        </div>
+        
+        <div style="text-align: center;">
+            <a href="/" class="btn">🏠 Accueil</a>
+            <a href="/test-payment" class="btn">🧪 Test paiement</a>
+        </div>
+    </div>
+</body>
+</html>
+        """,
+        stats=stats,
+        clients_with_email=list(clients_with_email.items())[:10],
+        clients_count=len(clients_with_email)
+        )
+        
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/config-help')
+def config_help():
+    """Guide de configuration détaillé avec Stripe"""
+    return render_template_string("""
+<!DOCTYPE html>
+<html>
+<head>
+    <title>📖 Guide de Configuration - Webhook + Stripe</title>
+    <meta charset="UTF-8">
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
+        .container { max-width: 800px; margin: 0 auto; background: white; padding: 20px; border-radius: 10px; }
+        .step { background: #e9ecef; padding: 15px; margin: 15px 0; border-radius: 5px; border-left: 4px solid #007bff; }
+        .stripe-step { border-left-color: #6c5ce7; background: #f3e5f5; }
+        .alert { padding: 15px; margin: 15px 0; border-radius: 5px; }
+        .alert-info { background: #d1ecf1; border: 2px solid #17a2b8; color: #0c5460; }
+        .alert-success { background: #d4edda; border: 2px solid #28a745; color: #155724; }
+        code { background: #f8f9fa; padding: 3px 8px; border-radius: 3px; font-family: monospace; }
+        .btn { background: #007bff; color: white; padding: 10px 20px; border: none; border-radius: 5px; text-decoration: none; display: inline-block; margin: 5px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📖 Guide de Configuration Webhook + Stripe</h1>
+        
+        <div class="alert alert-info">
+            <strong>🎯 Objectif :</strong> Configurer votre webhook avec Telegram ET Stripe pour les paiements de sécurisation de fonds (4,999€).
+        </div>
+        
+        <h2>🤖 PARTIE 1 : Configuration Telegram</h2>
+        
+        <div class="step">
+            <h3>1. Créer un bot Telegram</h3>
+            <p>• Cherchez <code>@BotFather</code> sur Telegram</p>
+            <p>• Tapez <code>/newbot</code></p>
+            <p>• Nom : "WebhookOVHStripe2024"</p>
+            <p>• Username : "webhook_ovh_stripe_2024_bot"</p>
+            <p>• <strong>Copiez le token reçu</strong></p>
+        </div>
+        
+        <div class="step">
+            <h3>2. Obtenir l'ID du groupe</h3>
+            <p>• Ajoutez le bot dans votre groupe</p>
+            <p>• Envoyez <code>/start</code></p>
+            <p>• Visitez : <code>https://api.telegram.org/bot[TOKEN]/getUpdates</code></p>
+            <p>• Cherchez "chat":{"id": (nombre négatif pour les groupes)</p>
+        </div>
+        
+        <h2>💳 PARTIE 2 : Configuration Stripe</h2>
+        
+        <div class="step stripe-step">
+            <h3>3. Récupérer les clés Stripe</h3>
+            <p>• Dashboard Stripe → Développeurs → Clés API</p>
+            <p>• Copiez la <strong>Clé secrète</strong> (sk_live_ ou sk_test_)</p>
+            <p>• La clé publique est déjà configurée</p>
+        </div>
+        
+        <div class="step stripe-step">
+            <h3>4. Configurer le webhook Stripe</h3>
+            <p>• Stripe → Développeurs → Webhooks</p>
+            <p>• URL : <code>https://votre-app.herokuapp.com/webhook/stripe</code></p>
+            <p>• Événements : <code>payment_intent.succeeded</code>, <code>payment_intent.payment_failed</code></p>
+            <p>• Copiez le secret (whsec_)</p>
+        </div>
+        
+        <div class="step">
+            <h3>5. Configurer Heroku Config Vars</h3>
+            <p><strong>Variables obligatoires :</strong></p>
+            <ul>
+                <li><code>TELEGRAM_TOKEN</code> = votre_token_bot</li>
+                <li><code>CHAT_ID</code> = votre_id_groupe</li>
+            </ul>
+            <p><strong>Variables Stripe :</strong></p>
+            <ul>
+                <li><code>STRIPE_SECRET_KEY</code> = sk_live_...</li>
+                <li><code>STRIPE_WEBHOOK_SECRET</code> = whsec_...</li>
+            </ul>
+        </div>
+        
+        <div class="alert alert-success">
+            <h3>✅ Nouvelles commandes disponibles :</h3>
+            <ul>
+                <li><code>/numero 0123456789</code> - Fiche client</li>
+                <li><code>/paiement 0123456789</code> - Lien 4,999€</li>
+                <li><code>/stripe_stats</code> - Statistiques paiements</li>
+            </ul>
+        </div>
+        
+        <div style="text-align: center; margin-top: 30px;">
+            <a href="/" class="btn">🏠 Retour</a>
+        </div>
+    </div>
+</body>
+</html>
+    """)
 
 @app.route('/upload', methods=['POST'])
 def upload_file():
@@ -136,7 +351,7 @@ def view_clients():
 <!DOCTYPE html>
 <html>
 <head>
-    <title>👥 Gestion Clients - Webhook Sécurisé + Stripe</title>
+    <title>👥 Gestion Clients - Webhook + Stripe</title>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
@@ -154,41 +369,20 @@ def view_clients():
         .status-client { background: #e8f5e8; }
         .stats { background: #f0f4f8; padding: 15px; margin-bottom: 20px; border-radius: 5px; }
         .table-container { max-height: 600px; overflow-y: auto; }
-        .highlight { background: yellow; }
         .auto-detected { background: #e3f2fd; font-weight: bold; }
         .payment-ready { background: #e8f5e8; font-weight: bold; }
         .no-email { background: #ffebee; }
     </style>
-    <script>
-        function generatePaymentLink(phone, email, name) {
-            if (!email || email === 'N/A') {
-                alert('❌ Email manquant pour ce client');
-                return;
-            }
-            
-            // Simuler l'envoi de la commande Telegram
-            const message = `Lien de paiement pour ${name} (${phone}): https://buy.stripe.com/{{ buy_button_id }}?prefilled_email=${encodeURIComponent(email)}`;
-            
-            if (navigator.clipboard) {
-                navigator.clipboard.writeText(`/paiement ${phone}`).then(() => {
-                    alert('✅ Commande copiée! Collez dans Telegram: /paiement ' + phone);
-                });
-            } else {
-                prompt('📋 Copiez cette commande dans Telegram:', `/paiement ${phone}`);
-            }
-        }
-    </script>
 </head>
 <body>
     <div class="container">
-        <h1>👥 Base Clients ({{ total_clients }} total) - Configuration Sécurisée + Stripe</h1>
+        <h1>👥 Base Clients ({{ total_clients }} total) - Webhook + Stripe</h1>
         
         <div class="stats">
             <strong>📊 Statistiques:</strong> 
             Total: {{ total_clients }} | 
             Affichés: {{ displayed_count }} |
             Avec appels: {{ with_calls }} |
-            Aujourd'hui: {{ today_calls }} |
             🏦 Banques auto-détectées: {{ auto_detected }} |
             💳 Avec email (Stripe ready): {{ clients_with_email }}
         </div>
@@ -217,7 +411,6 @@ def view_clients():
                     <th>📊 Statut</th>
                     <th>📈 Appels</th>
                     <th>🕐 Dernier</th>
-                    <th>💰 Action</th>
                 </tr>
                 {% for tel, client in clients %}
                 <tr class="status-{{ client.statut.lower().replace(' ', '') }}">
@@ -238,16 +431,6 @@ def view_clients():
                     <td><strong>{{ client.statut }}</strong></td>
                     <td style="text-align: center;">{{ client.nb_appels }}</td>
                     <td>{{ client.dernier_appel or '-' }}</td>
-                    <td style="text-align: center;">
-                        {% if client.email not in ['N/A', ''] %}
-                        <button onclick="generatePaymentLink('{{ tel }}', '{{ client.email }}', '{{ client.prenom }} {{ client.nom }}')" 
-                                class="btn btn-stripe" style="padding: 5px 10px; font-size: 10px;">
-                            💳 4999€
-                        </button>
-                        {% else %}
-                        <span style="color: #ccc;">❌</span>
-                        {% endif %}
-                    </td>
                 </tr>
                 {% endfor %}
             </table>
@@ -256,14 +439,6 @@ def view_clients():
         {% if displayed_count >= 100 and total_clients > 100 %}
         <p style="color: orange;"><strong>⚠️ Affichage limité aux 100 premiers. Utilisez la recherche.</strong></p>
         {% endif %}
-        
-        <div style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 5px;">
-            <h3>💡 Légende des couleurs :</h3>
-            <p>🟢 <strong>Vert (Email):</strong> Client prêt pour les paiements Stripe</p>
-            <p>🔵 <strong>Bleu (Banque):</strong> Banque auto-détectée via API</p>
-            <p>🔴 <strong>Rouge (Email):</strong> Email manquant - paiement impossible</p>
-            <p><strong>💳 Bouton 4999€:</strong> Génère un lien de paiement via Telegram</p>
-        </div>
     </div>
 </body>
 </html>
@@ -272,276 +447,9 @@ def view_clients():
     total_clients=upload_stats["total_clients"],
     displayed_count=len(filtered_clients),
     with_calls=len([c for c in clients_database.values() if c['nb_appels'] > 0]),
-    today_calls=len([c for c in clients_database.values() if c['dernier_appel'] and c['dernier_appel'].startswith(datetime.now().strftime('%d/%m/%Y'))]),
     auto_detected=auto_detected,
     clients_with_email=clients_with_email,
-    search=search,
-    buy_button_id=Config.STRIPE_BUY_BUTTON_ID
-    )
-
-@app.route('/stripe-dashboard')
-def stripe_dashboard():
-    """Dashboard Stripe avec statistiques détaillées"""
-    if not stripe_service.configured:
-        return jsonify({"error": "Stripe non configuré"}), 400
-    
-    try:
-        # Récupérer les statistiques
-        stats = stripe_service.get_payment_stats()
-        
-        # Récupérer les paiements récents
-        payment_intents = stripe.PaymentIntent.list(limit=20)
-        
-        # Clients avec email dans la base
-        clients_with_email = {k: v for k, v in clients_database.items() if v['email'] not in ['N/A', '']}
-        
-        return render_template_string("""
-<!DOCTYPE html>
-<html>
-<head>
-    <title>💳 Dashboard Stripe - Sécurisation de Fonds</title>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <style>
-        body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
-        .container { max-width: 1200px; margin: 0 auto; background: white; padding: 20px; border-radius: 10px; }
-        .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin-bottom: 30px; }
-        .stat-card { background: #f8f9fa; padding: 20px; border-radius: 8px; text-align: center; border-left: 4px solid #6c5ce7; }
-        .btn { background: #6c5ce7; color: white; padding: 10px 20px; border: none; cursor: pointer; border-radius: 5px; margin: 5px; text-decoration: none; display: inline-block; }
-        .btn:hover { background: #5f3dc4; }
-        .btn-success { background: #4CAF50; }
-        .payment-list { background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0; }
-        .payment-item { background: white; padding: 15px; margin: 10px 0; border-radius: 5px; border-left: 4px solid #4CAF50; }
-        .payment-failed { border-left-color: #f44336; }
-        .client-list { background: #f0f4f8; padding: 20px; border-radius: 8px; margin: 20px 0; }
-        code { background: #f4f4f4; padding: 2px 6px; border-radius: 3px; }
-    </style>
-    <script>
-        function copyPaymentCommand(phone) {
-            const command = `/paiement ${phone}`;
-            if (navigator.clipboard) {
-                navigator.clipboard.writeText(command).then(() => {
-                    alert('✅ Commande copiée! Collez dans Telegram: ' + command);
-                });
-            } else {
-                prompt('📋 Copiez cette commande dans Telegram:', command);
-            }
-        }
-        
-        function copyPaymentLink(email) {
-            const link = `https://buy.stripe.com/{{ buy_button_id }}?prefilled_email=${encodeURIComponent(email)}`;
-            if (navigator.clipboard) {
-                navigator.clipboard.writeText(link).then(() => {
-                    alert('✅ Lien copié! Vous pouvez l\\'envoyer directement au client.');
-                });
-            } else {
-                prompt('📋 Copiez ce lien:', link);
-            }
-        }
-    </script>
-</head>
-<body>
-    <div class="container">
-        <h1>💳 Dashboard Stripe - Sécurisation de Fonds</h1>
-        
-        <div class="stats">
-            <div class="stat-card">
-                <h3>💰 Paiements confirmés</h3>
-                <h2>{{ stats.get('total_payments', 0) }}</h2>
-            </div>
-            <div class="stat-card">
-                <h3>💵 Montant total</h3>
-                <h2>{{ "%.2f"|format(stats.get('total_amount', 0)) }} €</h2>
-            </div>
-            <div class="stat-card">
-                <h3>📊 Montant moyen</h3>
-                <h2>{{ "%.2f"|format(stats.get('average_amount', 0)) }} €</h2>
-            </div>
-            <div class="stat-card">
-                <h3>📅 Aujourd'hui</h3>
-                <h2>{{ stats.get('recent_payments', 0) }}</h2>
-            </div>
-        </div>
-        
-        <div style="text-align: center; margin: 20px 0;">
-            <a href="/" class="btn">🏠 Accueil</a>
-            <a href="/clients" class="btn">👥 Clients</a>
-            <a href="/test-payment" class="btn btn-success">🧪 Test paiement</a>
-        </div>
-        
-        <div class="payment-list">
-            <h2>📋 Paiements récents</h2>
-            {% if payments %}
-                {% for payment in payments %}
-                <div class="payment-item {% if payment.status != 'succeeded' %}payment-failed{% endif %}">
-                    <strong>{{ payment.status|title }}</strong> - {{ (payment.amount / 100)|round(2) }} €
-                    <br>
-                    <small>
-                        📧 {{ payment.receipt_email or 'N/A' }} | 
-                        🆔 {{ payment.id }} | 
-                        📅 {{ payment.created_date }}
-                    </small>
-                </div>
-                {% endfor %}
-            {% else %}
-                <p>Aucun paiement trouvé</p>
-            {% endif %}
-        </div>
-        
-        <div class="client-list">
-            <h2>👥 Clients prêts pour les paiements ({{ clients_count }} avec email)</h2>
-            {% if clients_with_email %}
-                {% for phone, client in clients_with_email %}
-                <div style="background: white; padding: 15px; margin: 10px 0; border-radius: 5px; display: flex; justify-content: space-between; align-items: center;">
-                    <div>
-                        <strong>{{ client.prenom }} {{ client.nom }}</strong><br>
-                        📞 {{ phone }} | 📧 {{ client.email }}
-                    </div>
-                    <div>
-                        <button onclick="copyPaymentCommand('{{ phone }}')" class="btn" style="padding: 5px 10px; margin: 2px;">
-                            📱 Telegram
-                        </button>
-                        <button onclick="copyPaymentLink('{{ client.email }}')" class="btn" style="padding: 5px 10px; margin: 2px;">
-                            🔗 Lien direct
-                        </button>
-                    </div>
-                </div>
-                {% endfor %}
-            {% else %}
-                <p>Aucun client avec email configuré</p>
-            {% endif %}
-        </div>
-        
-        <div style="background: #e8f5e8; padding: 20px; border-radius: 8px; margin: 20px 0;">
-            <h3>🔧 Configuration Stripe</h3>
-            <p><strong>Buy Button ID:</strong> <code>{{ buy_button_id }}</code></p>
-            <p><strong>Montant fixe:</strong> 4,999.00 €</p>
-            <p><strong>Service:</strong> Sécurisation de fonds investis</p>
-            <p><strong>Webhook configuré:</strong> {{ '✅ Oui' if webhook_configured else '❌ Non' }}</p>
-            <p><strong>URL Webhook:</strong> <code>{{ webhook_url }}/webhook/stripe</code></p>
-        </div>
-    </div>
-</body>
-</html>
-        """,
-        stats=stats,
-        payments=[{
-            'id': p.id,
-            'amount': p.amount,
-            'status': p.status,
-            'receipt_email': p.receipt_email,
-            'created_date': datetime.fromtimestamp(p.created).strftime('%d/%m/%Y %H:%M')
-        } for p in payment_intents.data],
-        clients_with_email=list(clients_with_email.items())[:20],  # Limiter à 20 pour l'affichage
-        clients_count=len(clients_with_email),
-        buy_button_id=Config.STRIPE_BUY_BUTTON_ID,
-        webhook_configured=bool(Config.STRIPE_WEBHOOK_SECRET),
-        webhook_url=request.url_root.rstrip('/')
-        )
-        
-    except Exception as e:
-        logger.error(f"❌ Erreur dashboard Stripe: {str(e)}")
-        return jsonify({"error": str(e)}), 500
-
-@app.route('/test-payment')
-def test_payment():
-    """Page de test pour les paiements Stripe"""
-    if not stripe_service.configured:
-        return jsonify({"error": "Stripe non configuré"}), 400
-    
-    # Trouver un client avec email pour le test
-    test_client = None
-    for phone, client in clients_database.items():
-        if client['email'] not in ['N/A', '']:
-            test_client = (phone, client)
-            break
-    
-    return render_template_string("""
-<!DOCTYPE html>
-<html>
-<head>
-    <title>🧪 Test Paiement Stripe</title>
-    <meta charset="UTF-8">
-    <style>
-        body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
-        .container { max-width: 800px; margin: 0 auto; background: white; padding: 20px; border-radius: 10px; }
-        .btn { background: #6c5ce7; color: white; padding: 15px 30px; border: none; cursor: pointer; border-radius: 5px; margin: 10px; text-decoration: none; display: inline-block; font-size: 16px; }
-        .btn:hover { background: #5f3dc4; }
-        .btn-success { background: #4CAF50; }
-        .test-section { background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0; }
-        code { background: #f4f4f4; padding: 2px 6px; border-radius: 3px; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>🧪 Test Paiement Stripe - Sécurisation de Fonds</h1>
-        
-        <div class="test-section">
-            <h2>💳 Configuration actuelle</h2>
-            <p><strong>Buy Button ID:</strong> <code>{{ buy_button_id }}</code></p>
-            <p><strong>Montant:</strong> 4,999.00 €</p>
-            <p><strong>Stripe configuré:</strong> {{ '✅ Oui' if stripe_configured else '❌ Non' }}</p>
-            <p><strong>Webhook configuré:</strong> {{ '✅ Oui' if webhook_configured else '❌ Non' }}</p>
-        </div>
-        
-        {% if test_client %}
-        <div class="test-section">
-            <h2>🎯 Test avec client réel</h2>
-            <p><strong>Client:</strong> {{ test_client[1].prenom }} {{ test_client[1].nom }}</p>
-            <p><strong>Téléphone:</strong> {{ test_client[0] }}</p>
-            <p><strong>Email:</strong> {{ test_client[1].email }}</p>
-            
-            <a href="{{ test_payment_url }}" target="_blank" class="btn">
-                💳 TESTER PAIEMENT 4,999€
-            </a>
-            
-            <p><strong>Lien généré:</strong></p>
-            <code style="word-break: break-all;">{{ test_payment_url }}</code>
-        </div>
-        {% endif %}
-        
-        <div class="test-section">
-            <h2>📱 Test via commandes Telegram</h2>
-            {% if test_client %}
-            <p>Copiez cette commande dans votre chat Telegram :</p>
-            <code>/paiement {{ test_client[0] }}</code>
-            <br><br>
-            {% endif %}
-            <p>Autres commandes de test :</p>
-            <ul>
-                <li><code>/stripe_stats</code> - Voir les statistiques</li>
-                <li><code>/stats</code> - Statistiques complètes</li>
-                <li><code>/help</code> - Liste des commandes</li>
-            </ul>
-        </div>
-        
-        <div class="test-section">
-            <h2>🔧 Informations de test Stripe</h2>
-            <p><strong>Cartes de test Stripe :</strong></p>
-            <ul>
-                <li><strong>Visa:</strong> 4242424242424242</li>
-                <li><strong>Visa (débit):</strong> 4000056655665556</li>
-                <li><strong>Mastercard:</strong> 5555555555554444</li>
-                <li><strong>Échec:</strong> 4000000000000002</li>
-            </ul>
-            <p><strong>Date d'expiration:</strong> N'importe quelle date future</p>
-            <p><strong>CVC:</strong> N'importe quel nombre à 3 chiffres</p>
-        </div>
-        
-        <div style="text-align: center; margin: 30px 0;">
-            <a href="/stripe-dashboard" class="btn">📊 Dashboard Stripe</a>
-            <a href="/clients" class="btn">👥 Clients</a>
-            <a href="/" class="btn btn-success">🏠 Accueil</a>
-        </div>
-    </div>
-</body>
-</html>
-    """,
-    buy_button_id=Config.STRIPE_BUY_BUTTON_ID,
-    stripe_configured=stripe_service.configured,
-    webhook_configured=bool(Config.STRIPE_WEBHOOK_SECRET),
-    test_client=test_client,
-    test_payment_url=f"https://buy.stripe.com/{Config.STRIPE_BUY_BUTTON_ID}?prefilled_email={quote_plus(test_client[1]['email'])}" if test_client else None
+    search=search
     )
 
 @app.route('/clear-clients')
@@ -561,7 +469,7 @@ def test_telegram():
             "action": "Ajoutez TELEGRAM_TOKEN et CHAT_ID dans Heroku Config Vars"
         }), 400
         
-    message = f"🧪 Test webhook sécurisé + Stripe - Ligne {Config.OVH_LINE_NUMBER} - {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}"
+    message = f"🧪 Test webhook sécurisé + Stripe - {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}"
     result = telegram_service.send_message(message)
     
     if result:
@@ -574,7 +482,7 @@ def test_command():
     if not telegram_service:
         return jsonify({
             "status": "error",
-            "message": "Service Telegram non configuré",
+            "message": "Service Telegram non configuré"
         }), 400
         
     if clients_database:
@@ -639,14 +547,7 @@ def test_normalize():
     return jsonify({
         "test_results": results,
         "total_clients_in_db": len(clients_database),
-        "sample_numbers_in_db": list(clients_database.keys())[:5] if clients_database else [],
-        "normalization_patterns": [
-            "0033XXXXXXXXX -> 0XXXXXXXXX",
-            "+33XXXXXXXXX -> 0XXXXXXXXX", 
-            "33XXXXXXXXX -> 0XXXXXXXXX",
-            "XXXXXXXXX -> 0XXXXXXXXX",
-            "0XXXXXXXXX -> 0XXXXXXXXX"
-        ]
+        "sample_numbers_in_db": list(clients_database.keys())[:5] if clients_database else []
     })
 
 @app.route('/check-webhook-config')
@@ -654,53 +555,16 @@ def check_webhook_config():
     """Vérifier la configuration du webhook Telegram"""
     if not Config.TELEGRAM_TOKEN:
         return jsonify({
-            "error": "TELEGRAM_TOKEN non configuré",
-            "action": "Ajoutez TELEGRAM_TOKEN dans Heroku Config Vars"
-        }), 400
-        
-    try:
-        # 1. Vérifier les infos du webhook actuel
-        webhook_info_url = f"https://api.telegram.org/bot{Config.TELEGRAM_TOKEN}/getWebhookInfo"
-        webhook_response = requests.get(webhook_info_url, timeout=10)
-        webhook_data = webhook_response.json() if webhook_response.status_code == 200 else {}
-        
-        # 2. Déterminer l'URL correcte du webhook
-        correct_webhook_url = request.url_root + "webhook/telegram"
-        current_webhook_url = webhook_data.get('result', {}).get('url', 'Aucun')
-        
-        # 3. Vérifier si des updates sont en attente
-        pending_updates = webhook_data.get('result', {}).get('pending_update_count', 0)
-        
-        return jsonify({
-            "webhook_configured": current_webhook_url != "Aucun",
-            "webhook_correct": current_webhook_url == correct_webhook_url,
-            "current_webhook_url": current_webhook_url,
-            "correct_webhook_url": correct_webhook_url,
-            "pending_updates": pending_updates,
-            "last_error": webhook_data.get('result', {}).get('last_error_message', 'Aucune'),
-            "recommendation": "Utilisez /fix-webhook-now pour corriger" if current_webhook_url != correct_webhook_url else "Webhook correctement configuré"
-        })
-        
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-@app.route('/fix-webhook-now')
-def fix_webhook_now():
-    """Configure automatiquement le webhook correct"""
-    if not Config.TELEGRAM_TOKEN:
-        return jsonify({
-            "error": "TELEGRAM_TOKEN non configuré",
-            "action": "Ajoutez TELEGRAM_TOKEN dans Heroku Config Vars"
+            "error": "TELEGRAM_TOKEN non configuré"
         }), 400
         
     try:
         webhook_url = request.url_root + "webhook/telegram"
         
-        # Configurer le webhook
         set_webhook_url = f"https://api.telegram.org/bot{Config.TELEGRAM_TOKEN}/setWebhook"
         data = {
             "url": webhook_url,
-            "drop_pending_updates": True  # Nettoie les anciens messages
+            "drop_pending_updates": True
         }
         
         response = requests.post(set_webhook_url, data=data, timeout=10)
@@ -710,8 +574,7 @@ def fix_webhook_now():
             return jsonify({
                 "status": "success",
                 "message": f"Webhook configuré avec succès sur {webhook_url}",
-                "telegram_response": result,
-                "next_step": "Testez maintenant avec /numero dans votre groupe Telegram"
+                "telegram_response": result
             })
         else:
             return jsonify({
@@ -742,172 +605,13 @@ def test_ovh_cgi():
     <p><a href="/webhook/ovh?{urlencode(params)}" style="background: #4CAF50; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">🎯 Déclencher test appel</a></p>
     <p><strong>Paramètres:</strong> {params}</p>
     <p><strong>Ligne configurée:</strong> {Config.OVH_LINE_NUMBER}</p>
-    <p><strong>Configuration:</strong> Variables d'environnement sécurisées</p>
     <p><strong>Stripe:</strong> {'✅ Configuré' if stripe_service.configured else '❌ Non configuré'}</p>
     <div style="margin-top: 20px;">
         <a href="/test-normalize" style="background: #ff9800; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">🔧 Test normalisation</a>
         <a href="/test-payment" style="background: #6c5ce7; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">💳 Test paiement</a>
-        <a href="/check-config" style="background: #17a2b8; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">🔍 Vérifier config</a>
         <a href="/" style="background: #2196F3; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">🏠 Retour accueil</a>
     </div>
     """
-
-@app.route('/config-help')
-def config_help():
-    """Guide de configuration détaillé avec Stripe"""
-    return render_template_string("""
-<!DOCTYPE html>
-<html>
-<head>
-    <title>📖 Guide de Configuration - Webhook Sécurisé + Stripe</title>
-    <meta charset="UTF-8">
-    <style>
-        body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
-        .container { max-width: 800px; margin: 0 auto; background: white; padding: 20px; border-radius: 10px; }
-        .step { background: #e9ecef; padding: 15px; margin: 15px 0; border-radius: 5px; border-left: 4px solid #007bff; }
-        .stripe-step { border-left-color: #6c5ce7; background: #f3e5f5; }
-        .alert { padding: 15px; margin: 15px 0; border-radius: 5px; }
-        .alert-info { background: #d1ecf1; border: 2px solid #17a2b8; color: #0c5460; }
-        .alert-success { background: #d4edda; border: 2px solid #28a745; color: #155724; }
-        .alert-warning { background: #fff3cd; border: 2px solid #ffc107; color: #856404; }
-        code { background: #f8f9fa; padding: 3px 8px; border-radius: 3px; font-family: monospace; }
-        .btn { background: #007bff; color: white; padding: 10px 20px; border: none; border-radius: 5px; text-decoration: none; display: inline-block; margin: 5px; }
-        .btn-stripe { background: #6c5ce7; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>📖 Guide de Configuration Webhook Sécurisé + Stripe</h1>
-        
-        <div class="alert alert-info">
-            <strong>🎯 Objectif :</strong> Configurer votre webhook avec Telegram ET Stripe pour les paiements de sécurisation de fonds (4,999€).
-        </div>
-        
-        <h2>🤖 PARTIE 1 : Configuration Telegram</h2>
-        
-        <div class="step">
-            <h3>1. 🤖 Créer un nouveau bot Telegram</h3>
-            <p>• Ouvrez Telegram et cherchez <code>@BotFather</code></p>
-            <p>• Tapez <code>/newbot</code></p>
-            <p>• Nom du bot : "WebhookOVHStripe2024"</p>
-            <p>• Username : "webhook_ovh_stripe_2024_bot" (doit finir par _bot)</p>
-            <p>• <strong>Copiez le token reçu</strong> (format: 1234567890:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA)</p>
-        </div>
-        
-        <div class="step">
-            <h3>2. 💬 Obtenir l'ID de votre groupe/chat</h3>
-            <p><strong>Méthode recommandée :</strong></p>
-            <p>• Ajoutez votre nouveau bot dans le groupe</p>
-            <p>• Envoyez un message dans le groupe : <code>/start</code></p>
-            <p>• Visitez : <code>https://api.telegram.org/bot[VOTRE_TOKEN]/getUpdates</code></p>
-            <p>• Cherchez "chat":{"id": dans la réponse (nombre négatif pour les groupes)</p>
-        </div>
-        
-        <h2>💳 PARTIE 2 : Configuration Stripe</h2>
-        
-        <div class="step stripe-step">
-            <h3>3. 🔑 Récupérer les clés Stripe</h3>
-            <p>• Connectez-vous à votre <strong>Dashboard Stripe</strong></p>
-            <p>• Allez dans <strong>Développeurs → Clés API</strong></p>
-            <p>• Copiez la <strong>Clé secrète</strong> (commence par sk_live_ ou sk_test_)</p>
-            <p>• La clé publique est déjà configurée : <code>pk_live_51RUrtyC8opMymz5G...</code></p>
-        </div>
-        
-        <div class="step stripe-step">
-            <h3>4. 🔗 Configurer le webhook Stripe</h3>
-            <p>• Dans Stripe Dashboard : <strong>Développeurs → Webhooks</strong></p>
-            <p>• Cliquez <strong>+ Ajouter un point de terminaison</strong></p>
-            <p>• URL : <code>https://votre-app.herokuapp.com/webhook/stripe</code></p>
-            <p>• Événements à sélectionner :</p>
-            <ul>
-                <li><code>payment_intent.succeeded</code></li>
-                <li><code>payment_intent.payment_failed</code></li>
-            </ul>
-            <p>• <strong>Copiez le secret de signature</strong> (commence par whsec_)</p>
-        </div>
-        
-        <div class="step">
-            <h3>5. ⚙️ Configurer Heroku Config Vars</h3>
-            <p>• Allez sur votre app Heroku (dashboard.heroku.com)</p>
-            <p>• Cliquez sur votre app → <strong>Settings</strong></p>
-            <p>• Section "Config Vars" → <strong>Reveal Config Vars</strong></p>
-            <p>• Ajoutez ces variables :</p>
-            <h4>📱 Variables Telegram (OBLIGATOIRES) :</h4>
-            <ul>
-                <li><code>TELEGRAM_TOKEN</code> = votre_token_du_bot</li>
-                <li><code>CHAT_ID</code> = votre_id_de_groupe (ex: -1002567065407)</li>
-            </ul>
-            <h4>💳 Variables Stripe (RECOMMANDÉES) :</h4>
-            <ul>
-                <li><code>STRIPE_SECRET_KEY</code> = sk_live_... (votre clé secrète)</li>
-                <li><code>STRIPE_WEBHOOK_SECRET</code> = whsec_... (secret webhook)</li>
-                <li><code>STRIPE_BUY_BUTTON_ID</code> = buy_btn_1RUzUoC8opMymz5GeubkCCp2 (déjà configuré)</li>
-            </ul>
-        </div>
-        
-        <div class="step">
-            <h3>6. 🚀 Déployer et tester</h3>
-            <p>• Redéployez votre application Heroku</p>
-            <p>• Visitez votre URL Heroku - vous devriez voir "✅ Configuration sécurisée active"</p>
-            <p>• Testez Telegram avec le bouton "📧 Test Telegram"</p>
-            <p>• Testez Stripe avec le bouton "💳 Test paiement"</p>
-            <p>• Configurez les webhooks avec "🔧 Corriger Webhook"</p>
-        </div>
-        
-        <div class="alert alert-success">
-            <h3>✅ Variables optionnelles (bonus) :</h3>
-            <ul>
-                <li><code>OVH_LINE_NUMBER</code> = 0033185093039 (votre ligne OVH)</li>
-                <li><code>ABSTRACT_API_KEY</code> = votre_clé_api (pour détection IBAN)</li>
-            </ul>
-        </div>
-        
-        <div class="alert alert-warning">
-            <h3>💡 Nouvelles commandes Telegram disponibles :</h3>
-            <ul>
-                <li><code>/numero 0123456789</code> - Fiche client</li>
-                <li><code>/paiement 0123456789</code> - Lien de paiement 4,999€</li>
-                <li><code>/stripe_stats</code> - Statistiques paiements</li>
-                <li><code>/stats</code> - Statistiques complètes</li>
-            </ul>
-        </div>
-        
-        <div class="step">
-            <h3>7. 🔒 Sécurité - Vérifications finales</h3>
-            <p>✅ Aucun token dans le code source</p>
-            <p>✅ Variables uniquement dans Heroku Config Vars</p>
-            <p>✅ GitHub ne contient aucun secret</p>
-            <p>✅ Webhooks Stripe sécurisés avec signature</p>
-            <p>✅ Montant fixe 4,999€ impossible à modifier côté client</p>
-            <p>✅ Tokens révocables à tout moment</p>
-        </div>
-        
-        <div style="text-align: center; margin-top: 30px;">
-            <a href="/" class="btn">🏠 Retour à l'accueil</a>
-            <a href="/check-config" class="btn">🔍 Vérifier ma config</a>
-            <a href="/stripe-dashboard" class="btn btn-stripe">💳 Dashboard Stripe</a>
-        </div>
-        
-        <div class="alert alert-info">
-            <h3>🆘 En cas de problème :</h3>
-            <p><strong>Telegram :</strong></p>
-            <ul>
-                <li>Vérifiez l'orthographe exacte des noms de variables</li>
-                <li>Le CHAT_ID doit être négatif pour les groupes</li>
-                <li>Le TOKEN doit contenir le caractère ":"</li>
-            </ul>
-            <p><strong>Stripe :</strong></p>
-            <ul>
-                <li>Utilisez la clé LIVE (sk_live_) pour la production</li>
-                <li>Vérifiez que le webhook pointe vers /webhook/stripe</li>
-                <li>Le secret webhook commence par whsec_</li>
-            </ul>
-            <p>⚠️ <strong>Redéployez après chaque modification des Config Vars</strong></p>
-        </div>
-    </div>
-</body>
-</html>
-    """)
 
 @app.route('/check-config')
 def check_config():
@@ -920,56 +624,28 @@ def check_config():
             "missing_variables": missing_vars,
             "telegram_token_configured": bool(Config.TELEGRAM_TOKEN),
             "chat_id_configured": bool(Config.CHAT_ID),
-            "telegram_token_format_valid": bool(Config.TELEGRAM_TOKEN and ':' in Config.TELEGRAM_TOKEN),
             "service_initialized": telegram_service is not None
         },
         "stripe": {
             "configured": stripe_service.configured,
             "secret_key_configured": bool(Config.STRIPE_SECRET_KEY),
             "webhook_secret_configured": bool(Config.STRIPE_WEBHOOK_SECRET),
-            "buy_button_id": Config.STRIPE_BUY_BUTTON_ID,
-            "publishable_key": Config.STRIPE_PUBLISHABLE_KEY
-        },
-        "recommendations": [
-            "Ajoutez TELEGRAM_TOKEN dans Heroku Config Vars" if not Config.TELEGRAM_TOKEN else None,
-            "Ajoutez CHAT_ID dans Heroku Config Vars" if not Config.CHAT_ID else None,
-            "Ajoutez STRIPE_SECRET_KEY pour activer les paiements" if not Config.STRIPE_SECRET_KEY else None,
-            "Ajoutez STRIPE_WEBHOOK_SECRET pour sécuriser les webhooks" if not Config.STRIPE_WEBHOOK_SECRET else None,
-            "Vérifiez le format du token (doit contenir :)" if Config.TELEGRAM_TOKEN and ':' not in Config.TELEGRAM_TOKEN else None
-        ]
+            "buy_button_id": Config.STRIPE_BUY_BUTTON_ID
+        }
     })
-
-# Route de debug simple
-@app.route('/debug')
-def debug():
-    return """
-    <html>
-    <head><title>🔍 Debug Webhook</title></head>
-    <body style="font-family: Arial; margin: 50px;">
-        <h1>🔍 Debug Webhook OVH-Stripe</h1>
-        <h2>✅ L'application fonctionne !</h2>
-        <p><strong>Variables d'environnement détectées :</strong></p>
-        <ul>
-            <li>TELEGRAM_TOKEN: {}</li>
-            <li>CHAT_ID: {}</li>
-            <li>STRIPE_SECRET_KEY: {}</li>
-            <li>STRIPE_BUY_BUTTON_ID: {}</li>
-        </ul>
-        <p><a href="/" style="background: #2196F3; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">🏠 Retour accueil</a></p>
-        <p><a href="/health" style="background: #4CAF50; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">🔍 Health Check</a></p>
-    </body>
-    </html>
-    """.format(
-        "✅ Configuré" if Config.TELEGRAM_TOKEN else "❌ Manquant",
-        "✅ Configuré" if Config.CHAT_ID else "❌ Manquant", 
-        "✅ Configuré" if Config.STRIPE_SECRET_KEY else "❌ Manquant",
-        Config.STRIPE_BUY_BUTTON_ID or "❌ Manquant"
-    )
 
 @app.route('/health')
 def health():
     is_valid, missing_vars = check_required_config()
-    stripe_stats = stripe_service.get_payment_stats()
+    
+    stripe_stats = {"total_payments": 0, "total_amount": 0}
+    try:
+        if stripe_service.configured:
+            stripe_stats = stripe_service.get_payment_stats()
+            if 'error' in stripe_stats:
+                stripe_stats = {"total_payments": 0, "total_amount": 0}
+    except:
+        stripe_stats = {"total_payments": 0, "total_amount": 0}
     
     return jsonify({
         "status": "healthy" if is_valid else "configuration_required", 
@@ -996,8 +672,7 @@ def health():
             "iban_detection": "API-enabled",
             "payment_processing": "stripe-buy-button",
             "webhook_security": "stripe-signature-verified",
-            "security": "environment-variables-only",
-            "webhook_management": "automatic-configuration"
+            "security": "environment-variables-only"
         },
         "ovh_line": Config.OVH_LINE_NUMBER,
         "clients_loaded": upload_stats["total_clients"],
@@ -1036,7 +711,568 @@ if __name__ == '__main__':
         logger.warning("   • STRIPE_SECRET_KEY manquante")
         logger.warning("   • Les paiements ne seront pas disponibles")
     
-    app.run(host='0.0.0.0', port=port, debug=False)from flask import Flask, request, jsonify, render_template_string, redirect
+    app.run(host='0.0.0.0', port=port, debug=False) "TELEGRAM_TOKEN non configuré"
+        }), 400
+        
+    try:
+        webhook_info_url = f"https://api.telegram.org/bot{Config.TELEGRAM_TOKEN}/getWebhookInfo"
+        webhook_response = requests.get(webhook_info_url, timeout=10)
+        webhook_data = webhook_response.json() if webhook_response.status_code == 200 else {}
+        
+        correct_webhook_url = request.url_root + "webhook/telegram"
+        current_webhook_url = webhook_data.get('result', {}).get('url', 'Aucun')
+        
+        return jsonify({
+            "webhook_configured": current_webhook_url != "Aucun",
+            "webhook_correct": current_webhook_url == correct_webhook_url,
+            "current_webhook_url": current_webhook_url,
+            "correct_webhook_url": correct_webhook_url,
+            "recommendation": "Utilisez /fix-webhook-now pour corriger" if current_webhook_url != correct_webhook_url else "Webhook correctement configuré"
+        })
+        
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/fix-webhook-now')
+def fix_webhook_now():
+    """Configure automatiquement le webhook correct"""
+    if not Config.TELEGRAM_TOKEN:
+        return jsonify({
+            "error":        elif message_text.startswith('/paiement '):
+            phone_number = message_text.replace('/paiement ', '').strip()
+            client_info = get_client_info(phone_number)
+            
+            if client_info['email'] != 'N/A':
+                payment_url, error = stripe_service.generate_payment_link(
+                    client_info['email'],
+                    f"{client_info['prenom']} {client_info['nom']}"
+                )
+                
+                if payment_url:
+                    response_message = f"""
+💳 <b>LIEN DE PAIEMENT GÉNÉRÉ - SÉCURISATION DE FONDS</b>
+
+👤 <b>Client:</b> {client_info['prenom']} {client_info['nom']}
+📞 <b>Téléphone:</b> {client_info['telephone']}
+📧 <b>Email:</b> {client_info['email']}
+💰 <b>Montant:</b> 4,999.00 €
+
+🔗 <b>LIEN DE PAIEMENT DIRECT:</b>
+<a href="{payment_url}">CLIQUEZ ICI POUR PAYER 4,999€</a>
+
+🔒 <b>SERVICE:</b> Dépôt de garantie pour la sécurisation de vos fonds investis
+✅ <b>SÉCURISÉ:</b> Paiement via Stripe avec email pré-rempli
+
+⏰ <b>Généré le:</b> {datetime.now().strftime("%d/%m/%Y %H:%M:%S")}
+                    """
+                    telegram_service.send_message(response_message)
+                    return {"status": "payment_link_generated", "phone": phone_number, "url": payment_url}
+                else:
+                    error_message = f"❌ <b>Erreur génération lien:</b> {error}"
+                    telegram_service.send_message(error_message)
+                    return {"status": "error", "message": error}
+            else:
+                no_email_message = f"⚠️ <b>Email manquant pour {client_info['prenom']} {client_info['nom']}</b>"
+                telegram_service.send_message(no_email_message)
+                return {"status": "error", "message": "Email manquant"}
+            
+        elif message_text.startswith('/iban '):
+            iban = message_text.replace('/iban ', '').strip()
+            detected_bank = iban_detector.detect_bank(iban)
+            response_message = f"""
+🏦 <b>ANALYSE IBAN VIA API</b>
+
+💳 IBAN: <code>{iban}</code>
+🏛️ Banque détectée: <b>{detected_bank}</b>
+
+🌐 <i>Détection via APIs externes avec fallback local</i>
+            """
+            telegram_service.send_message(response_message)
+            return {"status": "iban_analyzed", "iban": iban, "bank": detected_bank}
+        
+        # NOUVELLE COMMANDE STRIPE STATS
+        elif message_text.startswith('/stripe_stats'):
+            stats = stripe_service.get_payment_stats()
+            
+            if 'error' in stats:
+                stats_message = f"❌ <b>Erreur Stripe:</b> {stats['error']}"
+            else:
+                stats_message = f"""
+💳 <b>STATISTIQUES STRIPE - SÉCURISATION DE FONDS</b>
+
+💰 <b>Paiements confirmés:</b> {stats['total_payments']}
+💵 <b>Montant total:</b> {stats['total_amount']:.2f} €
+📊 <b>Montant moyen:</b> {stats.get('average_amount', 0):.2f} €
+📅 <b>Aujourd'hui:</b> {stats.get('recent_payments', 0)} paiements
+
+🔗 <b>Buy Button ID:</b> <code>{Config.STRIPE_BUY_BUTTON_ID}</code>
+🔒 <b>Configuré:</b> {'✅ Oui' if stripe_service.configured else '❌ Non'}
+
+⏰ <b>Dernière mise à jour:</b> {datetime.now().strftime("%d/%m/%Y %H:%M:%S")}
+                """
+            
+            telegram_service.send_message(stats_message)
+            return {"status": "stripe_stats_sent", "stats": stats}
+            
+        elif message_text.startswith('/stats'):
+            auto_detected = len([c for c in clients_database.values() if c['banque'] not in ['N/A', ''] and c['iban']])
+            stripe_stats = stripe_service.get_payment_stats()
+            
+            stats_message = f"""
+📊 <b>STATISTIQUES CAMPAGNE COMPLÈTES</b>
+
+👥 <b>BASE CLIENTS</b>
+▪️ Clients total: {upload_stats['total_clients']}
+▪️ Dernier upload: {upload_stats['last_upload'] or 'Aucun'}
+▪️ Fichier: {upload_stats['filename'] or 'Aucun'}
+▪️ Banques auto-détectées: {auto_detected}
+
+📞 <b>APPELS</b>
+▪️ Ligne OVH: {Config.OVH_LINE_NUMBER}
+▪️ Clients appelants: {len([c for c in clients_database.values() if c['dernier_appel'] and c['dernier_appel'].startswith(datetime.now().strftime('%d/%m/%Y'))])}
+▪️ Nouveaux contacts: {len([c for c in clients_database.values() if c['nb_appels'] == 0])}
+
+💳 <b>PAIEMENTS STRIPE</b>
+▪️ Paiements confirmés: {stripe_stats.get('total_payments', 'N/A')}
+▪️ Montant total: {stripe_stats.get('total_amount', 0):.2f} €
+▪️ Buy Button: {Config.STRIPE_BUY_BUTTON_ID}
+            """
+            telegram_service.send_message(stats_message)
+            return {"status": "stats_sent"}
+            
+        elif message_text.startswith('/help'):
+            help_message = f"""
+🤖 <b>COMMANDES DISPONIBLES - WEBHOOK + STRIPE</b>
+
+📞 <code>/numero 0123456789</code>
+   → Affiche la fiche client complète
+
+💳 <code>/paiement 0123456789</code>
+   → Génère un lien de paiement 4,999€ pour le client
+
+🏦 <code>/iban FR76XXXXXXXXX</code>
+   → Détecte la banque depuis l'IBAN
+
+💰 <code>/stripe_stats</code>
+   → Statistiques des paiements Stripe
+
+📊 <code>/stats</code>
+   → Statistiques complètes (clients + paiements)
+
+🆘 <code>/help</code>
+   → Affiche cette aide
+
+✅ <b>Le bot reçoit automatiquement:</b>
+▪️ Les appels entrants OVH sur {Config.OVH_LINE_NUMBER}
+▪️ Les notifications en temps réel
+▪️ 🌐 Détection automatique des banques via APIs IBAN
+▪️ 💳 Liens de paiement Stripe avec email pré-rempli
+            """
+            telegram_service.send_message(help_message)
+            return {"status": "help_sent"}
+            
+        else:
+            return {"status": "unknown_command"}
+            
+    except Exception as e:
+        logger.error(f"❌ Erreur commande Telegram: {str(e)}")
+        return {"error": str(e)}
+
+# ===================================================================
+# ROUTES WEBHOOK - VERSION AMÉLIORÉE AVEC STRIPE
+# ===================================================================
+
+@app.route('/webhook/ovh', methods=['POST', 'GET'])
+def ovh_webhook():
+    """Webhook pour recevoir les appels OVH - Version avec recherche améliorée et lien de paiement"""
+    try:
+        timestamp = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+        
+        if request.method == 'GET':
+            caller_number = request.args.get('caller', 'Inconnu')
+            called_number = request.args.get('callee', 'Inconnu') 
+            event_type = request.args.get('type', 'unknown')
+            call_status = f"CGI-{event_type}"
+            
+            logger.info(f"🔔 [{timestamp}] Appel CGI OVH: {caller_number} -> {called_number} ({event_type})")
+        else:
+            data = request.get_json() or {}
+            caller_number = data.get('callerIdNumber', request.args.get('caller', 'Inconnu'))
+            call_status = data.get('status', 'incoming')
+            
+            logger.info(f"🔔 [{timestamp}] Appel JSON: {json.dumps(data, indent=2)}")
+        
+        # Recherche client avec normalisation avancée
+        client_info = get_client_info_advanced(caller_number)
+        
+        # Message Telegram formaté avec option lien de paiement pour clients connus
+        if telegram_service:
+            include_payment = (client_info['statut'] != "Non référencé" and 
+                             client_info['email'] != 'N/A' and 
+                             stripe_service.configured)
+            
+            telegram_message = telegram_service.format_client_message(
+                client_info, 
+                context="appel", 
+                include_payment_link=include_payment
+            )
+            
+            telegram_message += f"\n📊 Statut appel: {call_status}"
+            telegram_message += f"\n🔗 Source: OVH"
+            
+            if include_payment:
+                telegram_message += f"\n\n💡 <b>TIP:</b> Utilisez <code>/paiement {caller_number}</code> pour un lien dédié"
+            
+            # Log pour debug
+            if client_info['statut'] != "Non référencé":
+                logger.info(f"✅ Fiche trouvée pour {caller_number}: {client_info['nom']} {client_info['prenom']}")
+            else:
+                logger.warning(f"❌ Aucune fiche trouvée pour {caller_number}")
+            
+            # Envoi vers Telegram
+            telegram_result = telegram_service.send_message(telegram_message)
+        else:
+            logger.warning("⚠️ Service Telegram non configuré - message non envoyé")
+            telegram_result = None
+        
+        return jsonify({
+            "status": "success",
+            "timestamp": timestamp,
+            "caller": caller_number,
+            "method": request.method,
+            "telegram_sent": telegram_result is not None,
+            "telegram_configured": telegram_service is not None,
+            "client": f"{client_info['prenom']} {client_info['nom']}",
+            "client_status": client_info['statut'],
+            "bank_detected": client_info.get('banque', 'N/A') not in ['N/A', ''],
+            "stripe_configured": stripe_service.configured,
+            "payment_link_available": (client_info['email'] != 'N/A' and stripe_service.configured),
+            "source": "OVH-CGI" if request.method == 'GET' else "OVH-JSON",
+            "formats_tried": "multiple_international_formats"
+        })
+        
+    except Exception as e:
+        logger.error(f"❌ Erreur webhook: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/webhook/telegram', methods=['POST'])
+def telegram_webhook():
+    if not config_valid:
+        logger.error("❌ Configuration Telegram invalide - webhook ignoré")
+        return jsonify({"error": "Configuration manquante"}), 400
+        
+    try:
+        data = request.get_json()
+        logger.info(f"📥 Webhook Telegram reçu: {json.dumps(data, indent=2)}")
+        
+        if 'message' in data and 'text' in data['message']:
+            message_text = data['message']['text']
+            chat_id = data['message']['chat']['id']
+            user_name = data['message']['from'].get('first_name', 'Utilisateur')
+            
+            logger.info(f"📱 Commande reçue de {user_name}: {message_text}")
+            
+            result = process_telegram_command(message_text, chat_id)
+            
+            return jsonify({
+                "status": "success",
+                "command_result": result,
+                "timestamp": datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+            })
+        
+        return jsonify({"status": "no_text_message"})
+        
+    except Exception as e:
+        logger.error(f"❌ Erreur webhook Telegram: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/webhook/stripe', methods=['POST'])
+def stripe_webhook():
+    """Webhook pour recevoir les notifications de paiement Stripe"""
+    if not Config.STRIPE_WEBHOOK_SECRET:
+        logger.warning("⚠️ STRIPE_WEBHOOK_SECRET non configuré")
+        return jsonify({"error": "Webhook secret manquant"}), 400
+    
+    payload = request.get_data()
+    sig_header = request.headers.get('Stripe-Signature')
+    
+    try:
+        # Vérifier la signature du webhook
+        event = stripe.Webhook.construct_event(
+            payload, sig_header, Config.STRIPE_WEBHOOK_SECRET
+        )
+        
+        logger.info(f"🔔 Webhook Stripe reçu: {event['type']}")
+        
+        # Traiter les événements de paiement
+        if event['type'] == 'payment_intent.succeeded':
+            payment_intent = event['data']['object']
+            
+            # Message de confirmation
+            confirmation_message = f"""
+🎉 <b>PAIEMENT CONFIRMÉ - SÉCURISATION DE FONDS</b>
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+💰 <b>Montant:</b> {payment_intent['amount'] / 100:.2f} €
+📧 <b>Client:</b> {payment_intent.get('receipt_email', 'N/A')}
+🆔 <b>ID Paiement:</b> <code>{payment_intent['id']}</code>
+🕐 <b>Date:</b> {datetime.now().strftime("%d/%m/%Y %H:%M:%S")}
+
+✅ <b>Statut:</b> FONDS SÉCURISÉS
+🔒 <b>Protection:</b> ACTIVÉE
+
+Le client peut maintenant accéder à ses fonds protégés.
+            """
+            
+            if telegram_service:
+                telegram_service.send_message(confirmation_message)
+            
+            return jsonify({"status": "payment_processed"})
+        
+        elif event['type'] == 'payment_intent.payment_failed':
+            payment_intent = event['data']['object']
+            
+            failure_message = f"""
+❌ <b>ÉCHEC DE PAIEMENT</b>
+
+💰 <b>Montant:</b> {payment_intent['amount'] / 100:.2f} €
+📧 <b>Client:</b> {payment_intent.get('receipt_email', 'N/A')}
+🆔 <b>ID Paiement:</b> <code>{payment_intent['id']}</code>
+⚠️ <b>Raison:</b> {payment_intent.get('last_payment_error', {}).get('message', 'Inconnue')}
+
+🔄 <b>Action recommandée:</b> Contacter le client pour un nouveau lien
+            """
+            
+            if telegram_service:
+                telegram_service.send_message(failure_message)
+            
+            return jsonify({"status": "payment_failed_processed"})
+        
+        return jsonify({"status": "event_ignored"})
+        
+    except ValueError as e:
+        logger.error(f"❌ Erreur signature Stripe: {str(e)}")
+        return jsonify({"error": "Invalid signature"}), 400
+    except Exception as e:
+        logger.error(f"❌ Erreur webhook Stripe: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+# ===================================================================
+# ROUTES PRINCIPALES AVEC STRIPE
+# ===================================================================
+
+@app.route('/')
+def home():
+    auto_detected = len([c for c in clients_database.values() if c['banque'] not in ['N/A', ''] and c['iban']])
+    
+    # Ajouter les stats Stripe de manière sécurisée
+    stripe_stats = {"total_payments": 0, "total_amount": 0}
+    try:
+        if stripe_service.configured:
+            stripe_stats = stripe_service.get_payment_stats()
+            if 'error' in stripe_stats:
+                stripe_stats = {"total_payments": 0, "total_amount": 0}
+    except:
+        stripe_stats = {"total_payments": 0, "total_amount": 0}
+    
+    clients_with_email = len([c for c in clients_database.values() if c['email'] not in ['N/A', '']])
+    
+    return render_template_string("""
+<!DOCTYPE html>
+<html>
+<head>
+    <title>🤖 Webhook OVH-Telegram-Stripe SÉCURISÉ</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
+        .container { max-width: 1200px; margin: 0 auto; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .header { text-align: center; margin-bottom: 30px; }
+        .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin-bottom: 30px; }
+        .stat-card { background: #e3f2fd; padding: 20px; border-radius: 8px; text-align: center; }
+        .stripe-card { background: #e8f5e8; border-left: 4px solid #4caf50; }
+        .upload-section { background: #f0f4f8; padding: 20px; border-radius: 8px; margin-bottom: 20px; }
+        .btn { background: #2196F3; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; text-decoration: none; display: inline-block; margin: 5px; }
+        .btn:hover { background: #1976D2; }
+        .btn-danger { background: #f44336; }
+        .btn-success { background: #4CAF50; }
+        .btn-warning { background: #ff9800; }
+        .btn-info { background: #17a2b8; }
+        .btn-stripe { background: #6c5ce7; }
+        .links { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; }
+        .success { color: #4CAF50; font-weight: bold; }
+        .error { color: #f44336; font-weight: bold; }
+        code { background: #f4f4f4; padding: 2px 6px; border-radius: 3px; }
+        .info-box { background: #e8f5e8; padding: 15px; border-radius: 8px; margin: 10px 0; }
+        .config-section { background: #e1f5fe; border-left: 4px solid #2196F3; padding: 15px; margin: 20px 0; }
+        .stripe-section { background: #f3e5f5; border-left: 4px solid #9c27b0; padding: 15px; margin: 20px 0; }
+        .security-section { background: #e8f5e8; border-left: 4px solid #4caf50; padding: 15px; margin: 20px 0; }
+        .error-section { background: #ffebee; border-left: 4px solid #f44336; padding: 15px; margin: 20px 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🤖 Webhook OVH-Telegram-Stripe SÉCURISÉ</h1>
+            
+            {% if config_valid %}
+            <div class="config-section">
+                <strong>✅ CONFIGURATION TELEGRAM ACTIVE :</strong><br>
+                📱 Chat ID: <code>{{ chat_id or 'Non configuré' }}</code><br>
+                📞 Ligne OVH: <code>{{ ovh_line }}</code><br>
+                🤖 Token: <code>{{ token_display }}</code><br>
+                🔒 Source: Variables d'environnement Heroku
+            </div>
+            {% else %}
+            <div class="error-section">
+                <strong>❌ CONFIGURATION TELEGRAM MANQUANTE :</strong><br>
+                Variables d'environnement manquantes dans Heroku Config Vars :<br>
+                {% for var in missing_vars %}
+                • <code>{{ var }}</code><br>
+                {% endfor %}
+                <p><strong>🔧 Ajoutez ces variables dans Heroku → Settings → Config Vars</strong></p>
+            </div>
+            {% endif %}
+            
+            <div class="stripe-section">
+                <strong>💳 CONFIGURATION STRIPE :</strong><br>
+                {% if stripe_configured %}
+                ✅ Stripe configuré et opérationnel<br>
+                🔗 Buy Button ID: <code>{{ buy_button_id }}</code><br>
+                💰 Montant fixe: 4,999.00 €<br>
+                🔒 Webhook: {{ '✅ Configuré' if webhook_configured else '⚠️ À configurer' }}
+                {% else %}
+                ❌ Configuration Stripe manquante<br>
+                Variables requises: STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET
+                {% endif %}
+            </div>
+            
+            <div class="security-section">
+                <strong>🔒 SÉCURITÉ RENFORCÉE :</strong><br>
+                ✅ Aucun token hardcodé dans le code<br>
+                ✅ Configuration via variables d'environnement uniquement<br>
+                ✅ Vérification automatique de la configuration<br>
+                ✅ Protection contre les tokens compromis<br>
+                ✅ Webhooks Stripe sécurisés avec signature
+            </div>
+            
+            <p class="{{ 'success' if config_valid else 'error' }}">
+                {{ '✅ Application correctement configurée' if config_valid else '❌ Configuration requise' }}
+            </p>
+        </div>
+
+        {% if config_valid %}
+        <div class="stats">
+            <div class="stat-card">
+                <h3>👥 Clients chargés</h3>
+                <h2>{{ total_clients }}</h2>
+            </div>
+            <div class="stat-card">
+                <h3>🏦 Banques détectées</h3>
+                <h2>{{ auto_detected }}</h2>
+            </div>
+            <div class="stat-card stripe-card">
+                <h3>💳 Paiements Stripe</h3>
+                <h2>{{ stripe_total_payments }}</h2>
+                <p>{{ stripe_total_amount }}€ total</p>
+            </div>
+            <div class="stat-card">
+                <h3>📧 Clients avec email</h3>
+                <h2>{{ clients_with_email }}</h2>
+                <p>Prêts pour paiement</p>
+            </div>
+        </div>
+
+        <div class="upload-section">
+            <h2>📂 Upload fichier clients (CSV uniquement)</h2>
+            <form action="/upload" method="post" enctype="multipart/form-data">
+                <div class="info-box">
+                    <p><strong>📋 Format supporté:</strong> CSV (.csv)</p>
+                    <p><strong>🔥 Colonne obligatoire:</strong> <code>telephone</code> (ou tel, phone, numero)</p>
+                    <p><strong>✨ Colonnes optionnelles:</strong></p>
+                    <ul style="text-align: left; max-width: 800px; margin: 0 auto;">
+                        <li><strong>Identité:</strong> nom, prenom, sexe, date_naissance, lieu_naissance</li>
+                        <li><strong>Contact:</strong> email, adresse, ville, code_postal</li>
+                        <li><strong>Professionnel:</strong> entreprise, profession</li>
+                        <li><strong>Bancaire:</strong> banque, swift, iban</li>
+                        <li><strong>Divers:</strong> statut, situation_familiale</li>
+                    </ul>
+                    <div style="background: #fff3e0; padding: 10px; margin-top: 10px; border-radius: 5px;">
+                        <strong>🌐 AUTO-DÉTECTION BANQUE :</strong> Si la colonne <code>banque</code> est vide mais qu'un <code>iban</code> est présent, la banque sera automatiquement détectée via APIs !
+                    </div>
+                    <div style="background: #f3e5f5; padding: 10px; margin-top: 10px; border-radius: 5px;">
+                        <strong>💳 STRIPE INTEGRATION :</strong> Avec un <code>email</code> valide, les liens de paiement 4,999€ seront automatiquement disponibles !
+                    </div>
+                </div>
+                <input type="file" name="file" accept=".csv" required style="margin: 10px 0;">
+                <br>
+                <button type="submit" class="btn btn-success">📁 Charger fichier CSV</button>
+            </form>
+        </div>
+
+        <h2>🔧 Tests & Configuration</h2>
+        <div class="links">
+            <a href="/clients" class="btn">👥 Voir clients</a>
+            <a href="/test-telegram" class="btn">📧 Test Telegram</a>
+            <a href="/test-command" class="btn">🎯 Test /numero</a>
+            <a href="/test-payment" class="btn btn-stripe">💳 Test paiement</a>
+            <a href="/stripe-dashboard" class="btn btn-stripe">📊 Dashboard Stripe</a>
+            <a href="/check-webhook-config" class="btn btn-danger">🔗 Diagnostic Webhook</a>
+            <a href="/fix-webhook-now" class="btn btn-success">🔧 Corriger Webhook</a>
+            <a href="/test-iban" class="btn">🏦 Test détection IBAN</a>
+            <a href="/test-normalize" class="btn btn-info">🔧 Test Normalisation</a>
+            <a href="/test-ovh-cgi" class="btn">📞 Test appel OVH</a>
+            <a href="/clear-clients" class="btn btn-danger" onclick="return confirm('Effacer tous les clients ?')">🗑️ Vider base</a>
+        </div>
+        {% else %}
+        <div class="error-section">
+            <h2>🔧 CONFIGURATION REQUISE</h2>
+            <p>Pour utiliser cette application, configurez les variables suivantes dans <strong>Heroku → Settings → Config Vars</strong> :</p>
+            <ul>
+                <li><code>TELEGRAM_TOKEN</code> = Votre token de bot (obtenu via @BotFather)</li>
+                <li><code>CHAT_ID</code> = ID de votre groupe/chat Telegram</li>
+            </ul>
+            <p><strong>Variables Stripe (recommandées) :</strong></p>
+            <ul>
+                <li><code>STRIPE_SECRET_KEY</code> = Votre clé secrète Stripe</li>
+                <li><code>STRIPE_WEBHOOK_SECRET</code> = Secret du webhook Stripe</li>
+                <li><code>STRIPE_BUY_BUTTON_ID</code> = ID de votre buy button (par défaut: buy_btn_1RUzUoC8opMymz5GeubkCCp2)</li>
+            </ul>
+            <p><strong>Variables optionnelles :</strong></p>
+            <ul>
+                <li><code>OVH_LINE_NUMBER</code> = Numéro de votre ligne OVH (par défaut: 0033185093039)</li>
+                <li><code>ABSTRACT_API_KEY</code> = Clé API pour détection IBAN</li>
+            </ul>
+            <div style="margin-top: 20px;">
+                <a href="/config-help" class="btn btn-info">📖 Guide de configuration</a>
+                <a href="/" class="btn">🔄 Recharger</a>
+            </div>
+        </div>
+        {% endif %}
+
+        <h2>🔗 Configuration OVH CTI</h2>
+        <div class="info-box">
+            <p><strong>URL CGI à configurer dans l'interface OVH :</strong></p>
+            <code>{{ webhook_url }}/webhook/ovh?caller=*CALLING*&callee=*CALLED*&type=*EVENT*</code>
+            <br><br>
+            <p><strong>🎯 Remplacez par votre URL Heroku réelle</strong></p>
+        </div>
+
+        <h2>🔗 Configuration Webhook Stripe</h2>
+        <div class="info-box">
+            <p><strong>URL Webhook à configurer dans Stripe Dashboard :</strong></p>
+            <code>{{ webhook_url }}/webhook/stripe</code>
+            <br><br>
+            <p><strong>📋 Événements à sélectionner :</strong></p>
+            <ul style="text-align: left;">
+                <li><code>payment_intent.succeeded</code> - Paiement réussi</li>
+                <li><code>payment_intent.payment_failed</code> - Paiement échoué</li>
+            </ul>
+        </div>
+
+        <h2>📱 Commandes Telegram disponibles</h2>
+        <ul>
+            <li><code>/numero 0123456789</code> - Affiche fiche client complètefrom flask import Flask, request, jsonify, render_template_string, redirect
 import os
 import json
 import requests
@@ -1083,6 +1319,11 @@ class Config:
     
     # APIs IBAN - optionnelles
     ABSTRACT_API_KEY = os.environ.get('ABSTRACT_API_KEY')
+    
+    # Keyyo OAuth2 - optionnelles
+    KEYYO_CLIENT_ID = os.environ.get('KEYYO_CLIENT_ID', '')
+    KEYYO_CLIENT_SECRET = os.environ.get('KEYYO_CLIENT_SECRET', '')
+    KEYYO_REDIRECT_URI = os.environ.get('KEYYO_REDIRECT_URI', '')
 
 # Configuration Stripe
 if Config.STRIPE_SECRET_KEY:
@@ -1333,7 +1574,7 @@ class StripeService:
 stripe_service = StripeService()
 
 # ===================================================================
-# SERVICE TELEGRAM AMÉLIORÉ AVEC STRIPE
+# SERVICE TELEGRAM
 # ===================================================================
 
 class TelegramService:
@@ -1683,782 +1924,7 @@ def process_telegram_command(message_text, chat_id):
             telegram_service.send_message(response_message)
             return {"status": "command_processed", "command": "numero", "phone": phone_number}
         
+        # NOUVELLE COMMANDE PAIEMENT
         elif message_text.startswith('/paiement '):
             phone_number = message_text.replace('/paiement ', '').strip()
-            client_info = get_client_info(phone_number)
-            
-            if client_info['email'] != 'N/A':
-                payment_url, error = stripe_service.generate_payment_link(
-                    client_info['email'],
-                    f"{client_info['prenom']} {client_info['nom']}"
-                )
-                
-                if payment_url:
-                    response_message = f"""
-💳 <b>LIEN DE PAIEMENT GÉNÉRÉ - SÉCURISATION DE FONDS</b>
-
-👤 <b>Client:</b> {client_info['prenom']} {client_info['nom']}
-📞 <b>Téléphone:</b> {client_info['telephone']}
-📧 <b>Email:</b> {client_info['email']}
-💰 <b>Montant:</b> 4,999.00 €
-
-🔗 <b>LIEN DE PAIEMENT DIRECT:</b>
-<a href="{payment_url}">CLIQUEZ ICI POUR PAYER 4,999€</a>
-
-🔒 <b>SERVICE:</b> Dépôt de garantie pour la sécurisation de vos fonds investis
-✅ <b>SÉCURISÉ:</b> Paiement via Stripe avec email pré-rempli
-📋 <b>DESCRIPTION:</b> Ce versement permet d'activer les protections avancées de votre compte
-
-🎯 <b>Instructions client:</b>
-1. Cliquer sur le lien ci-dessus
-2. Vérifier l'email pré-rempli
-3. Entrer les informations de carte
-4. Valider le paiement de 4,999€
-
-⏰ <b>Généré le:</b> {datetime.now().strftime("%d/%m/%Y %H:%M:%S")}
-                    """
-                    
-                    telegram_service.send_message(response_message)
-                    return {"status": "payment_link_generated", "phone": phone_number, "email": client_info['email'], "url": payment_url}
-                else:
-                    error_message = f"❌ <b>Erreur génération lien de paiement</b>\n\nClient: {client_info['prenom']} {client_info['nom']}\nErreur: {error}"
-                    telegram_service.send_message(error_message)
-                    return {"status": "error", "message": error}
-            else:
-                no_email_message = f"""
-⚠️ <b>IMPOSSIBLE DE GÉNÉRER LE LIEN</b>
-
-👤 <b>Client:</b> {client_info['prenom']} {client_info['nom']}
-📞 <b>Téléphone:</b> {client_info['telephone']}
-❌ <b>Problème:</b> Aucun email configuré
-
-🔧 <b>Solution:</b> Ajoutez l'email du client dans votre base de données
-                """
-                telegram_service.send_message(no_email_message)
-                return {"status": "error", "message": "Email manquant"}
-            
-        elif message_text.startswith('/iban '):
-            iban = message_text.replace('/iban ', '').strip()
-            detected_bank = iban_detector.detect_bank(iban)
-            response_message = f"""
-🏦 <b>ANALYSE IBAN VIA API</b>
-
-💳 IBAN: <code>{iban}</code>
-🏛️ Banque détectée: <b>{detected_bank}</b>
-
-🌐 <i>Détection via APIs externes avec fallback local</i>
-            """
-            telegram_service.send_message(response_message)
-            return {"status": "iban_analyzed", "iban": iban, "bank": detected_bank}
-        
-        elif message_text.startswith('/stripe_stats'):
-            stats = stripe_service.get_payment_stats()
-            
-            if 'error' in stats:
-                stats_message = f"❌ <b>Erreur Stripe:</b> {stats['error']}"
-            else:
-                stats_message = f"""
-💳 <b>STATISTIQUES STRIPE - SÉCURISATION DE FONDS</b>
-
-💰 <b>Paiements confirmés:</b> {stats['total_payments']}
-💵 <b>Montant total:</b> {stats['total_amount']:.2f} €
-📊 <b>Montant moyen:</b> {stats['average_amount']:.2f} €
-📅 <b>Aujourd'hui:</b> {stats['recent_payments']} paiements
-
-🔗 <b>Buy Button ID:</b> <code>{Config.STRIPE_BUY_BUTTON_ID}</code>
-🔒 <b>Configuré:</b> {'✅ Oui' if stripe_service.configured else '❌ Non'}
-
-⏰ <b>Dernière mise à jour:</b> {datetime.now().strftime("%d/%m/%Y %H:%M:%S")}
-                """
-            
-            telegram_service.send_message(stats_message)
-            return {"status": "stripe_stats_sent", "stats": stats}
-            
-        elif message_text.startswith('/stats'):
-            auto_detected = len([c for c in clients_database.values() if c['banque'] not in ['N/A', ''] and c['iban']])
-            stripe_stats = stripe_service.get_payment_stats()
-            
-            stats_message = f"""
-📊 <b>STATISTIQUES CAMPAGNE COMPLÈTES</b>
-
-👥 <b>BASE CLIENTS</b>
-▪️ Clients total: {upload_stats['total_clients']}
-▪️ Dernier upload: {upload_stats['last_upload'] or 'Aucun'}
-▪️ Fichier: {upload_stats['filename'] or 'Aucun'}
-▪️ Banques auto-détectées: {auto_detected}
-
-📞 <b>APPELS</b>
-▪️ Ligne OVH: {Config.OVH_LINE_NUMBER}
-▪️ Clients appelants: {len([c for c in clients_database.values() if c['dernier_appel'] and c['dernier_appel'].startswith(datetime.now().strftime('%d/%m/%Y'))])}
-▪️ Nouveaux contacts: {len([c for c in clients_database.values() if c['nb_appels'] == 0])}
-
-💳 <b>PAIEMENTS STRIPE</b>
-▪️ Paiements confirmés: {stripe_stats.get('total_payments', 'N/A')}
-▪️ Montant total: {stripe_stats.get('total_amount', 0):.2f} €
-▪️ Buy Button: {Config.STRIPE_BUY_BUTTON_ID}
-            """
-            telegram_service.send_message(stats_message)
-            return {"status": "stats_sent"}
-            
-        elif message_text.startswith('/help'):
-            help_message = f"""
-🤖 <b>COMMANDES DISPONIBLES - WEBHOOK SÉCURISÉ + STRIPE</b>
-
-📞 <code>/numero 0123456789</code>
-   → Affiche la fiche client complète
-
-💳 <code>/paiement 0123456789</code>
-   → Génère un lien de paiement 4,999€ pour le client
-
-🏦 <code>/iban FR76XXXXXXXXX</code>
-   → Détecte la banque depuis l'IBAN
-
-💰 <code>/stripe_stats</code>
-   → Statistiques des paiements Stripe
-
-📊 <code>/stats</code>
-   → Statistiques complètes (clients + paiements)
-
-🆘 <code>/help</code>
-   → Affiche cette aide
-
-✅ <b>FONCTIONNALITÉS AUTOMATIQUES:</b>
-▪️ Appels entrants OVH sur {Config.OVH_LINE_NUMBER}
-▪️ Détection automatique des banques via APIs IBAN
-▪️ Liens de paiement Stripe avec email pré-rempli
-▪️ Montant fixe: 4,999€ pour sécurisation de fonds
-
-🔒 <b>SÉCURITÉ:</b> Configuration via variables d'environnement uniquement
-            """
-            telegram_service.send_message(help_message)
-            return {"status": "help_sent"}
-            
-        else:
-            return {"status": "unknown_command"}
-            
-    except Exception as e:
-        logger.error(f"❌ Erreur commande Telegram: {str(e)}")
-        return {"error": str(e)}
-
-# ===================================================================
-# ROUTES WEBHOOK - VERSION AMÉLIORÉE AVEC STRIPE
-# ===================================================================
-
-@app.route('/webhook/ovh', methods=['POST', 'GET'])
-def ovh_webhook():
-    """Webhook pour recevoir les appels OVH - Version avec recherche améliorée et lien de paiement"""
-    try:
-        timestamp = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
-        
-        if request.method == 'GET':
-            caller_number = request.args.get('caller', 'Inconnu')
-            called_number = request.args.get('callee', 'Inconnu') 
-            event_type = request.args.get('type', 'unknown')
-            call_status = f"CGI-{event_type}"
-            
-            logger.info(f"🔔 [{timestamp}] Appel CGI OVH: {caller_number} -> {called_number} ({event_type})")
-        else:
-            data = request.get_json() or {}
-            caller_number = data.get('callerIdNumber', request.args.get('caller', 'Inconnu'))
-            call_status = data.get('status', 'incoming')
-            
-            logger.info(f"🔔 [{timestamp}] Appel JSON: {json.dumps(data, indent=2)}")
-        
-        # Recherche client avec normalisation avancée
-        client_info = get_client_info_advanced(caller_number)
-        
-        # Message Telegram formaté avec option lien de paiement pour clients connus
-        if telegram_service:
-            include_payment = (client_info['statut'] != "Non référencé" and 
-                             client_info['email'] != 'N/A' and 
-                             stripe_service.configured)
-            
-            telegram_message = telegram_service.format_client_message(
-                client_info, 
-                context="appel", 
-                include_payment_link=include_payment
-            )
-            
-            telegram_message += f"\n📊 Statut appel: {call_status}"
-            telegram_message += f"\n🔗 Source: OVH"
-            
-            if include_payment:
-                telegram_message += f"\n\n💡 <b>TIP:</b> Utilisez <code>/paiement {caller_number}</code> pour un lien dédié"
-            
-            # Log pour debug
-            if client_info['statut'] != "Non référencé":
-                logger.info(f"✅ Fiche trouvée pour {caller_number}: {client_info['nom']} {client_info['prenom']}")
-            else:
-                logger.warning(f"❌ Aucune fiche trouvée pour {caller_number}")
-            
-            # Envoi vers Telegram
-            telegram_result = telegram_service.send_message(telegram_message)
-        else:
-            logger.warning("⚠️ Service Telegram non configuré - message non envoyé")
-            telegram_result = None
-        
-        return jsonify({
-            "status": "success",
-            "timestamp": timestamp,
-            "caller": caller_number,
-            "method": request.method,
-            "telegram_sent": telegram_result is not None,
-            "telegram_configured": telegram_service is not None,
-            "client": f"{client_info['prenom']} {client_info['nom']}",
-            "client_status": client_info['statut'],
-            "bank_detected": client_info.get('banque', 'N/A') not in ['N/A', ''],
-            "stripe_configured": stripe_service.configured,
-            "payment_link_available": (client_info['email'] != 'N/A' and stripe_service.configured),
-            "source": "OVH-CGI" if request.method == 'GET' else "OVH-JSON",
-            "formats_tried": "multiple_international_formats"
-        })
-        
-    except Exception as e:
-        logger.error(f"❌ Erreur webhook: {str(e)}")
-        return jsonify({"error": str(e)}), 500
-
-@app.route('/webhook/telegram', methods=['POST'])
-def telegram_webhook():
-    if not config_valid:
-        logger.error("❌ Configuration Telegram invalide - webhook ignoré")
-        return jsonify({"error": "Configuration manquante"}), 400
-        
-    try:
-        data = request.get_json()
-        logger.info(f"📥 Webhook Telegram reçu: {json.dumps(data, indent=2)}")
-        
-        if 'message' in data and 'text' in data['message']:
-            message_text = data['message']['text']
-            chat_id = data['message']['chat']['id']
-            user_name = data['message']['from'].get('first_name', 'Utilisateur')
-            
-            logger.info(f"📱 Commande reçue de {user_name}: {message_text}")
-            
-            result = process_telegram_command(message_text, chat_id)
-            
-            return jsonify({
-                "status": "success",
-                "command_result": result,
-                "timestamp": datetime.now().strftime("%d/%m/%Y %H:%M:%S")
-            })
-        
-        return jsonify({"status": "no_text_message"})
-        
-    except Exception as e:
-        logger.error(f"❌ Erreur webhook Telegram: {str(e)}")
-        return jsonify({"error": str(e)}), 500
-
-@app.route('/webhook/stripe', methods=['POST'])
-def stripe_webhook():
-    """Webhook pour recevoir les notifications de paiement Stripe"""
-    if not Config.STRIPE_WEBHOOK_SECRET:
-        logger.warning("⚠️ STRIPE_WEBHOOK_SECRET non configuré - webhook non sécurisé")
-        return jsonify({"error": "Webhook secret manquant"}), 400
-    
-    payload = request.get_data()
-    sig_header = request.headers.get('Stripe-Signature')
-    
-    try:
-        # Vérifier la signature du webhook
-        event = stripe.Webhook.construct_event(
-            payload, sig_header, Config.STRIPE_WEBHOOK_SECRET
-        )
-        
-        logger.info(f"🔔 Webhook Stripe reçu: {event['type']}")
-        
-        # Traiter les événements de paiement
-        if event['type'] == 'payment_intent.succeeded':
-            payment_intent = event['data']['object']
-            
-            # Message de confirmation
-            confirmation_message = f"""
-🎉 <b>PAIEMENT CONFIRMÉ - SÉCURISATION DE FONDS</b>
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-💰 <b>Montant:</b> {payment_intent['amount'] / 100:.2f} €
-📧 <b>Client:</b> {payment_intent.get('receipt_email', 'N/A')}
-🆔 <b>ID Paiement:</b> <code>{payment_intent['id']}</code>
-🕐 <b>Date:</b> {datetime.now().strftime("%d/%m/%Y %H:%M:%S")}
-
-✅ <b>Statut:</b> FONDS SÉCURISÉS
-🔒 <b>Protection:</b> ACTIVÉE
-📋 <b>Conformité:</b> VALIDÉE
-
-🎯 <b>Action:</b> Le client peut maintenant accéder à ses fonds protégés
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-            """
-            
-            if telegram_service:
-                telegram_service.send_message(confirmation_message)
-            
-            return jsonify({"status": "payment_processed"})
-        
-        elif event['type'] == 'payment_intent.payment_failed':
-            payment_intent = event['data']['object']
-            
-            failure_message = f"""
-❌ <b>ÉCHEC DE PAIEMENT</b>
-
-💰 <b>Montant:</b> {payment_intent['amount'] / 100:.2f} €
-📧 <b>Client:</b> {payment_intent.get('receipt_email', 'N/A')}
-🆔 <b>ID Paiement:</b> <code>{payment_intent['id']}</code>
-⚠️ <b>Raison:</b> {payment_intent.get('last_payment_error', {}).get('message', 'Inconnue')}
-
-🔄 <b>Action recommandée:</b> Contacter le client pour un nouveau lien
-            """
-            
-            if telegram_service:
-                telegram_service.send_message(failure_message)
-            
-            return jsonify({"status": "payment_failed_processed"})
-        
-        return jsonify({"status": "event_ignored"})
-        
-    except ValueError as e:
-        logger.error(f"❌ Erreur signature Stripe: {str(e)}")
-        return jsonify({"error": "Invalid signature"}), 400
-    except Exception as e:
-        logger.error(f"❌ Erreur webhook Stripe: {str(e)}")
-        return jsonify({"error": str(e)}), 500
-
-# ===================================================================
-# ROUTES PRINCIPALES AVEC STRIPE
-# ===================================================================
-
-@app.route('/')
-def home():
-    try:
-        # Calculs sécurisés avec gestion d'erreurs
-        auto_detected = 0
-        stripe_stats = {"total_payments": 0, "total_amount": 0}
-        
-        try:
-            auto_detected = len([c for c in clients_database.values() if c.get('banque', 'N/A') not in ['N/A', ''] and c.get('iban')])
-        except:
-            auto_detected = 0
-            
-        try:
-            if stripe_service and stripe_service.configured:
-                stripe_stats = stripe_service.get_payment_stats()
-                if isinstance(stripe_stats, dict) and 'error' not in stripe_stats:
-                    pass  # OK
-                else:
-                    stripe_stats = {"total_payments": 0, "total_amount": 0}
-        except:
-            stripe_stats = {"total_payments": 0, "total_amount": 0}
-        
-        return render_template_string("""
-<!DOCTYPE html>
-<html>
-<head>
-    <title>🤖 Webhook OVH-Telegram-Stripe SÉCURISÉ</title>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <style>
-        body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
-        .container { max-width: 1200px; margin: 0 auto; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        .header { text-align: center; margin-bottom: 30px; }
-        .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin-bottom: 30px; }
-        .stat-card { background: #e3f2fd; padding: 20px; border-radius: 8px; text-align: center; }
-        .stripe-card { background: #e8f5e8; border-left: 4px solid #4caf50; }
-        .upload-section { background: #f0f4f8; padding: 20px; border-radius: 8px; margin-bottom: 20px; }
-        .btn { background: #2196F3; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; text-decoration: none; display: inline-block; margin: 5px; }
-        .btn:hover { background: #1976D2; }
-        .btn-danger { background: #f44336; }
-        .btn-success { background: #4CAF50; }
-        .btn-warning { background: #ff9800; }
-        .btn-info { background: #17a2b8; }
-        .btn-stripe { background: #6c5ce7; }
-        .links { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; }
-        .success { color: #4CAF50; font-weight: bold; }
-        .error { color: #f44336; font-weight: bold; }
-        code { background: #f4f4f4; padding: 2px 6px; border-radius: 3px; }
-        .info-box { background: #e8f5e8; padding: 15px; border-radius: 8px; margin: 10px 0; }
-        .config-section { background: #e1f5fe; border-left: 4px solid #2196F3; padding: 15px; margin: 20px 0; }
-        .stripe-section { background: #f3e5f5; border-left: 4px solid #9c27b0; padding: 15px; margin: 20px 0; }
-        .security-section { background: #e8f5e8; border-left: 4px solid #4caf50; padding: 15px; margin: 20px 0; }
-        .error-section { background: #ffebee; border-left: 4px solid #f44336; padding: 15px; margin: 20px 0; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div class="header">
-            <h1>🤖 Webhook OVH-Telegram-Stripe SÉCURISÉ</h1>
-            
-            {% if config_valid %}
-            <div class="config-section">
-                <strong>✅ CONFIGURATION TELEGRAM ACTIVE :</strong><br>
-                📱 Chat ID: <code>{{ chat_id }}</code><br>
-                📞 Ligne OVH: <code>{{ ovh_line }}</code><br>
-                🤖 Token: <code>{{ token_display }}</code><br>
-                🔒 Source: Variables d'environnement Heroku
-            </div>
-            {% else %}
-            <div class="error-section">
-                <strong>❌ CONFIGURATION TELEGRAM MANQUANTE :</strong><br>
-                Variables d'environnement manquantes dans Heroku Config Vars :<br>
-                • <code>TELEGRAM_TOKEN</code><br>
-                • <code>CHAT_ID</code><br>
-                <p><strong>🔧 Ajoutez ces variables dans Heroku → Settings → Config Vars</strong></p>
-            </div>
-            {% endif %}
-            
-            <div class="stripe-section">
-                <strong>💳 CONFIGURATION STRIPE :</strong><br>
-                {% if stripe_configured %}
-                ✅ Stripe configuré et opérationnel<br>
-                🔗 Buy Button ID: <code>{{ buy_button_id }}</code><br>
-                💰 Montant fixe: 4,999.00 €<br>
-                🔒 Webhook: {{ '✅ Configuré' if webhook_configured else '⚠️ À configurer' }}
-                {% else %}
-                ❌ Configuration Stripe manquante<br>
-                Variables requises: STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET
-                {% endif %}
-            </div>
-            
-            <div class="security-section">
-                <strong>🔒 SÉCURITÉ RENFORCÉE :</strong><br>
-                ✅ Aucun token hardcodé dans le code<br>
-                ✅ Configuration via variables d'environnement uniquement<br>
-                ✅ Vérification automatique de la configuration<br>
-                ✅ Protection contre les tokens compromis<br>
-                ✅ Webhooks Stripe sécurisés avec signature
-            </div>
-            
-            <p class="{{ 'success' if config_valid else 'error' }}">
-                {{ '✅ Application correctement configurée' if config_valid else '❌ Configuration requise' }}
-            </p>
-        </div>
-
-        <div class="stats">
-            <div class="stat-card">
-                <h3>👥 Clients chargés</h3>
-                <h2>{{ total_clients }}</h2>
-            </div>
-            <div class="stat-card">
-                <h3>🏦 Banques détectées</h3>
-                <h2>{{ auto_detected }}</h2>
-            </div>
-            <div class="stat-card stripe-card">
-                <h3>💳 Paiements Stripe</h3>
-                <h2>{{ stripe_total_payments }}</h2>
-                <p>{{ stripe_total_amount }}€ total</p>
-            </div>
-            <div class="stat-card">
-                <h3>📞 Ligne OVH</h3>
-                <p>{{ ovh_line }}</p>
-            </div>
-        </div>
-
-        <div class="upload-section">
-            <h2>📂 Upload fichier clients (CSV uniquement)</h2>
-            <form action="/upload" method="post" enctype="multipart/form-data">
-                <div class="info-box">
-                    <p><strong>📋 Format supporté:</strong> CSV (.csv)</p>
-                    <p><strong>🔥 Colonne obligatoire:</strong> <code>telephone</code> (ou tel, phone, numero)</p>
-                    <p><strong>✨ Colonnes optionnelles:</strong></p>
-                    <ul style="text-align: left; max-width: 800px; margin: 0 auto;">
-                        <li><strong>Identité:</strong> nom, prenom, sexe, date_naissance, lieu_naissance</li>
-                        <li><strong>Contact:</strong> email, adresse, ville, code_postal</li>
-                        <li><strong>Professionnel:</strong> entreprise, profession</li>
-                        <li><strong>Bancaire:</strong> banque, swift, iban</li>
-                        <li><strong>Divers:</strong> statut, situation_familiale</li>
-                    </ul>
-                    <div style="background: #fff3e0; padding: 10px; margin-top: 10px; border-radius: 5px;">
-                        <strong>🌐 AUTO-DÉTECTION BANQUE :</strong> Si la colonne <code>banque</code> est vide mais qu'un <code>iban</code> est présent, la banque sera automatiquement détectée via APIs !
-                    </div>
-                    <div style="background: #f3e5f5; padding: 10px; margin-top: 10px; border-radius: 5px;">
-                        <strong>💳 STRIPE INTEGRATION :</strong> Avec un <code>email</code> valide, les liens de paiement 4,999€ seront automatiquement disponibles !
-                    </div>
-                </div>
-                <input type="file" name="file" accept=".csv" required style="margin: 10px 0;">
-                <br>
-                <button type="submit" class="btn btn-success">📁 Charger fichier CSV</button>
-            </form>
-        </div>
-
-        <h2>🔧 Tests & Configuration</h2>
-        <div class="links">
-            <a href="/clients" class="btn">👥 Voir clients</a>
-            <a href="/test-telegram" class="btn">📧 Test Telegram</a>
-            <a href="/test-command" class="btn">🎯 Test /numero</a>
-            <a href="/test-payment" class="btn btn-stripe">💳 Test paiement</a>
-            <a href="/stripe-dashboard" class="btn btn-stripe">📊 Dashboard Stripe</a>
-            <a href="/check-webhook-config" class="btn btn-danger">🔗 Diagnostic Webhook</a>
-            <a href="/fix-webhook-now" class="btn btn-success">🔧 Corriger Webhook</a>
-            <a href="/test-iban" class="btn">🏦 Test détection IBAN</a>
-            <a href="/test-normalize" class="btn btn-info">🔧 Test Normalisation</a>
-            <a href="/test-ovh-cgi" class="btn">📞 Test appel OVH</a>
-            <a href="/clear-clients" class="btn btn-danger" onclick="return confirm('Effacer tous les clients ?')">🗑️ Vider base</a>
-        </div>
-
-        <h2>🔗 Configuration OVH CTI</h2>
-        <div class="info-box">
-            <p><strong>URL CGI à configurer dans l'interface OVH :</strong></p>
-            <code>{{ webhook_url }}/webhook/ovh?caller=*CALLING*&callee=*CALLED*&type=*EVENT*</code>
-            <br><br>
-            <p><strong>🎯 Remplacez par votre URL Heroku réelle</strong></p>
-        </div>
-
-        <h2>🔗 Configuration Webhook Stripe</h2>
-        <div class="info-box">
-            <p><strong>URL Webhook à configurer dans Stripe Dashboard :</strong></p>
-            <code>{{ webhook_url }}/webhook/stripe</code>
-            <br><br>
-            <p><strong>📋 Événements à sélectionner :</strong></p>
-            <ul style="text-align: left;">
-                <li><code>payment_intent.succeeded</code> - Paiement réussi</li>
-                <li><code>payment_intent.payment_failed</code> - Paiement échoué</li>
-            </ul>
-        </div>
-
-        <h2>📱 Commandes Telegram disponibles</h2>
-        <ul>
-            <li><code>/numero 0123456789</code> - Affiche fiche client complète (recherche intelligente)</li>
-            <li><code>/paiement 0123456789</code> - Génère un lien de paiement 4,999€ pour le client</li>
-            <li><code>/iban FR76XXXXXXXXX</code> - Détecte la banque depuis l'IBAN</li>
-            <li><code>/stripe_stats</code> - Statistiques des paiements Stripe</li>
-            <li><code>/stats</code> - Statistiques complètes de la campagne</li>
-            <li><code>/help</code> - Aide et liste des commandes</li>
-        </ul>
-
-        <div class="security-section">
-            <h3>🔒 Avantages de cette version sécurisée :</h3>
-            <ul>
-                <li>✅ <strong>Zéro token hardcodé</strong> - impossible de voler depuis le code source</li>
-                <li>✅ <strong>Configuration Heroku uniquement</strong> - variables d'environnement sécurisées</li>
-                <li>✅ <strong>Vérification automatique</strong> - détecte les configurations manquantes</li>
-                <li>✅ <strong>Recherche téléphone avancée</strong> - tous formats (0033, +33, 33, 0X)</li>
-                <li>✅ <strong>Détection IBAN automatique</strong> - via APIs multiples</li>
-                <li>✅ <strong>Intégration Stripe complète</strong> - liens de paiement automatiques</li>
-                <li>✅ <strong>Webhooks sécurisés</strong> - signature Stripe vérifiée</li>
-                <li>✅ <strong>Diagnostic complet</strong> - résolution automatique des problèmes</li>
-                <li>✅ <strong>Interface complète</strong> - gestion et tests intégrés</li>
-            </ul>
-        </div>
-    </div>
-</body>
-</html>
-        """, 
-        # Variables sécurisées
-        config_valid=config_valid,
-        total_clients=upload_stats.get("total_clients", 0),
-        auto_detected=auto_detected,
-        stripe_configured=stripe_service.configured if stripe_service else False,
-        stripe_total_payments=stripe_stats.get('total_payments', 0),
-        stripe_total_amount=f"{stripe_stats.get('total_amount', 0):.2f}",
-        webhook_configured=bool(Config.STRIPE_WEBHOOK_SECRET),
-        buy_button_id=Config.STRIPE_BUY_BUTTON_ID or "buy_btn_1RUzUoC8opMymz5GeubkCCp2",
-        chat_id=Config.CHAT_ID or "Non configuré",
-        ovh_line=Config.OVH_LINE_NUMBER or "0033185093039",
-        token_display=f"{Config.TELEGRAM_TOKEN[:10]}...{Config.TELEGRAM_TOKEN[-5:]}" if Config.TELEGRAM_TOKEN else "Non configuré",
-        webhook_url=request.url_root.rstrip('/')
-        )
-        
-    except Exception as e:
-        # Page d'erreur simple en cas de problème
-        logger.error(f"❌ Erreur page d'accueil: {str(e)}")
-        return f"""
-        <html>
-        <head><title>❌ Erreur Webhook</title></head>
-        <body style="font-family: Arial; margin: 50px; text-align: center;">
-            <h1>❌ Erreur de chargement</h1>
-            <p><strong>Erreur:</strong> {str(e)}</p>
-            <p><strong>Solution:</strong></p>
-            <ul style="text-align: left; max-width: 600px; margin: 0 auto;">
-                <li>Vérifiez les logs Heroku: <code>heroku logs --tail</code></li>
-                <li>Vérifiez les variables d'environnement</li>
-                <li>Redéployez l'application</li>
-            </ul>
-            <p><a href="/health" style="background: #2196F3; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">🔍 Check Health</a></p>
-        </body>
-        </html>
-        """
-<!DOCTYPE html>
-<html>
-<head>
-    <title>🤖 Webhook OVH-Telegram-Stripe SÉCURISÉ</title>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <style>
-        body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
-        .container { max-width: 1200px; margin: 0 auto; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        .header { text-align: center; margin-bottom: 30px; }
-        .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin-bottom: 30px; }
-        .stat-card { background: #e3f2fd; padding: 20px; border-radius: 8px; text-align: center; }
-        .stripe-card { background: #e8f5e8; border-left: 4px solid #4caf50; }
-        .upload-section { background: #f0f4f8; padding: 20px; border-radius: 8px; margin-bottom: 20px; }
-        .btn { background: #2196F3; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; text-decoration: none; display: inline-block; margin: 5px; }
-        .btn:hover { background: #1976D2; }
-        .btn-danger { background: #f44336; }
-        .btn-success { background: #4CAF50; }
-        .btn-warning { background: #ff9800; }
-        .btn-info { background: #17a2b8; }
-        .btn-stripe { background: #6c5ce7; }
-        .links { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; }
-        .success { color: #4CAF50; font-weight: bold; }
-        .error { color: #f44336; font-weight: bold; }
-        code { background: #f4f4f4; padding: 2px 6px; border-radius: 3px; }
-        .info-box { background: #e8f5e8; padding: 15px; border-radius: 8px; margin: 10px 0; }
-        .config-section { background: #e1f5fe; border-left: 4px solid #2196F3; padding: 15px; margin: 20px 0; }
-        .stripe-section { background: #f3e5f5; border-left: 4px solid #9c27b0; padding: 15px; margin: 20px 0; }
-        .security-section { background: #e8f5e8; border-left: 4px solid #4caf50; padding: 15px; margin: 20px 0; }
-        .error-section { background: #ffebee; border-left: 4px solid #f44336; padding: 15px; margin: 20px 0; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div class="header">
-            <h1>🤖 Webhook OVH-Telegram-Stripe SÉCURISÉ</h1>
-            
-            {% if config_valid %}
-            <div class="config-section">
-                <strong>✅ CONFIGURATION TELEGRAM ACTIVE :</strong><br>
-                📱 Chat ID: <code>{{ chat_id or 'Non configuré' }}</code><br>
-                📞 Ligne OVH: <code>{{ ovh_line }}</code><br>
-                🤖 Token: <code>{{ token_display }}</code><br>
-                🔒 Source: Variables d'environnement Heroku
-            </div>
-            {% else %}
-            <div class="error-section">
-                <strong>❌ CONFIGURATION TELEGRAM MANQUANTE :</strong><br>
-                Variables d'environnement manquantes dans Heroku Config Vars :<br>
-                {% for var in missing_vars %}
-                • <code>{{ var }}</code><br>
-                {% endfor %}
-                <p><strong>🔧 Ajoutez ces variables dans Heroku → Settings → Config Vars</strong></p>
-            </div>
-            {% endif %}
-            
-            <div class="stripe-section">
-                <strong>💳 CONFIGURATION STRIPE :</strong><br>
-                {% if stripe_configured %}
-                ✅ Stripe configuré et opérationnel<br>
-                🔗 Buy Button ID: <code>{{ buy_button_id }}</code><br>
-                💰 Montant fixe: 4,999.00 €<br>
-                🔒 Webhook: {{ '✅ Configuré' if webhook_configured else '⚠️ À configurer' }}
-                {% else %}
-                ❌ Configuration Stripe manquante<br>
-                Variables requises: STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET
-                {% endif %}
-            </div>
-            
-            <div class="security-section">
-                <strong>🔒 SÉCURITÉ RENFORCÉE :</strong><br>
-                ✅ Aucun token hardcodé dans le code<br>
-                ✅ Configuration via variables d'environnement uniquement<br>
-                ✅ Vérification automatique de la configuration<br>
-                ✅ Protection contre les tokens compromis<br>
-                ✅ Webhooks Stripe sécurisés avec signature
-            </div>
-            
-            <p class="{{ 'success' if config_valid else 'error' }}">
-                {{ '✅ Application correctement configurée' if config_valid else '❌ Configuration requise' }}
-            </p>
-        </div>
-
-        {% if config_valid %}
-        <div class="stats">
-            <div class="stat-card">
-                <h3>👥 Clients chargés</h3>
-                <h2>{{ total_clients }}</h2>
-            </div>
-            <div class="stat-card">
-                <h3>🏦 Banques détectées</h3>
-                <h2>{{ auto_detected }}</h2>
-            </div>
-            <div class="stat-card stripe-card">
-                <h3>💳 Paiements Stripe</h3>
-                <h2>{{ stripe_total_payments }}</h2>
-                <p>{{ stripe_total_amount }}€ total</p>
-            </div>
-            <div class="stat-card">
-                <h3>📞 Ligne OVH</h3>
-                <p>{{ ovh_line }}</p>
-            </div>
-        </div>
-
-        <div class="upload-section">
-            <h2>📂 Upload fichier clients (CSV uniquement)</h2>
-            <form action="/upload" method="post" enctype="multipart/form-data">
-                <div class="info-box">
-                    <p><strong>📋 Format supporté:</strong> CSV (.csv)</p>
-                    <p><strong>🔥 Colonne obligatoire:</strong> <code>telephone</code> (ou tel, phone, numero)</p>
-                    <p><strong>✨ Colonnes optionnelles:</strong></p>
-                    <ul style="text-align: left; max-width: 800px; margin: 0 auto;">
-                        <li><strong>Identité:</strong> nom, prenom, sexe, date_naissance, lieu_naissance</li>
-                        <li><strong>Contact:</strong> email, adresse, ville, code_postal</li>
-                        <li><strong>Professionnel:</strong> entreprise, profession</li>
-                        <li><strong>Bancaire:</strong> banque, swift, iban</li>
-                        <li><strong>Divers:</strong> statut, situation_familiale</li>
-                    </ul>
-                    <div style="background: #fff3e0; padding: 10px; margin-top: 10px; border-radius: 5px;">
-                        <strong>🌐 AUTO-DÉTECTION BANQUE :</strong> Si la colonne <code>banque</code> est vide mais qu'un <code>iban</code> est présent, la banque sera automatiquement détectée via APIs !
-                    </div>
-                    <div style="background: #f3e5f5; padding: 10px; margin-top: 10px; border-radius: 5px;">
-                        <strong>💳 STRIPE INTEGRATION :</strong> Avec un <code>email</code> valide, les liens de paiement 4,999€ seront automatiquement disponibles !
-                    </div>
-                </div>
-                <input type="file" name="file" accept=".csv" required style="margin: 10px 0;">
-                <br>
-                <button type="submit" class="btn btn-success">📁 Charger fichier CSV</button>
-            </form>
-        </div>
-
-        <h2>🔧 Tests & Configuration</h2>
-        <div class="links">
-            <a href="/clients" class="btn">👥 Voir clients</a>
-            <a href="/test-telegram" class="btn">📧 Test Telegram</a>
-            <a href="/test-command" class="btn">🎯 Test /numero</a>
-            <a href="/test-payment" class="btn btn-stripe">💳 Test paiement</a>
-            <a href="/stripe-dashboard" class="btn btn-stripe">📊 Dashboard Stripe</a>
-            <a href="/check-webhook-config" class="btn btn-danger">🔗 Diagnostic Webhook</a>
-            <a href="/fix-webhook-now" class="btn btn-success">🔧 Corriger Webhook</a>
-            <a href="/test-iban" class="btn">🏦 Test détection IBAN</a>
-            <a href="/test-normalize" class="btn btn-info">🔧 Test Normalisation</a>
-            <a href="/test-ovh-cgi" class="btn">📞 Test appel OVH</a>
-            <a href="/clear-clients" class="btn btn-danger" onclick="return confirm('Effacer tous les clients ?')">🗑️ Vider base</a>
-        </div>
-        {% else %}
-        <div class="error-section">
-            <h2>🔧 CONFIGURATION REQUISE</h2>
-            <p>Pour utiliser cette application, configurez les variables suivantes dans <strong>Heroku → Settings → Config Vars</strong> :</p>
-            <ul>
-                <li><code>TELEGRAM_TOKEN</code> = Votre token de bot (obtenu via @BotFather)</li>
-                <li><code>CHAT_ID</code> = ID de votre groupe/chat Telegram</li>
-            </ul>
-            <p><strong>Variables Stripe (recommandées) :</strong></p>
-            <ul>
-                <li><code>STRIPE_SECRET_KEY</code> = Votre clé secrète Stripe</li>
-                <li><code>STRIPE_WEBHOOK_SECRET</code> = Secret du webhook Stripe</li>
-                <li><code>STRIPE_BUY_BUTTON_ID</code> = ID de votre buy button (par défaut: buy_btn_1RUzUoC8opMymz5GeubkCCp2)</li>
-            </ul>
-            <p><strong>Variables optionnelles :</strong></p>
-            <ul>
-                <li><code>OVH_LINE_NUMBER</code> = Numéro de votre ligne OVH (par défaut: 0033185093039)</li>
-                <li><code>ABSTRACT_API_KEY</code> = Clé API pour détection IBAN</li>
-            </ul>
-            <div style="margin-top: 20px;">
-                <a href="/config-help" class="btn btn-info">📖 Guide de configuration</a>
-                <a href="/" class="btn">🔄 Recharger</a>
-            </div>
-        </div>
-        {% endif %}
-
-        <h2>🔗 Configuration OVH CTI</h2>
-        <div class="info-box">
-            <p><strong>URL CGI à configurer dans l'interface OVH :</strong></p>
-            <code>{{ webhook_url }}/webhook/ovh?caller=*CALLING*&callee=*CALLED*&type=*EVENT*</code>
-            <br><br>
-            <p><strong>🎯 Remplacez par votre URL Heroku réelle</strong></p>
-        </div>
-
-        <h2>🔗 Configuration Webhook Stripe</h2>
-        <div class="info-box">
-            <p><strong>URL Webhook à configurer dans Stripe Dashboard :</strong></p>
-            <code>{{ webhook_url }}/webhook/stripe</code>
-            <br><br>
-            <p><strong>📋 Événements à sélectionner :</strong></p>
-            <ul style="text-align: left;">
-                <li><code>payment_intent.succeeded</code> - Paiement réussi</li>
-                <li><code>payment_intent.payment_failed</code> -
+            client_info = get_client_info(phone_
