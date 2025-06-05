@@ -268,29 +268,17 @@ class TelegramService:
 📞 Numéro: <code>{client_info['telephone']}</code>
 🏢 Ligne: <code>{Config.OVH_LINE_NUMBER}</code>
 🕐 Heure: {datetime.now().strftime("%d/%m/%Y %H:%M:%S")}
-
-👤 <b>IDENTITÉ</b>
 ▪️ Nom: <b>{client_info['nom']}</b>
 ▪️ Prénom: <b>{client_info['prenom']}</b>
-👥 Sexe: {client_info.get('sexe', 'N/A')}
 🎂 Date de naissance: {client_info.get('date_naissance', 'N/A')}
 📍 Lieu de naissance: {client_info.get('lieu_naissance', 'N/A')}
-
-🏢 <b>PROFESSIONNEL</b>
-▪️ Entreprise: {client_info['entreprise']}
-▪️ Profession: {client_info.get('profession', 'N/A')}
 📧 Email: {client_info['email']}
-
-🏠 <b>COORDONNÉES</b>
 ▪️ Adresse: {client_info['adresse']}
 ▪️ Ville: {client_info['ville']} {client_info['code_postal']}
-
 🏦 <b>INFORMATIONS BANCAIRES</b>
 ▪️ Banque: {banque_display}
 ▪️ SWIFT: <code>{client_info.get('swift', 'N/A')}</code>
 ▪️ IBAN: <code>{client_info.get('iban', 'N/A')}</code>
-
-📊 <b>CAMPAGNE</b>
 ▪️ Statut: <b>{client_info['statut']}</b>
 ▪️ Nb appels: {client_info['nb_appels']}
 ▪️ Dernier appel: {client_info['dernier_appel'] or 'Premier appel'}
